@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/order_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
 class _Reagent {
@@ -204,6 +206,170 @@ class _ShopScreenState extends State<ShopScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            Text(
+              'My Orders',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+                letterSpacing: -0.2,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              height: 170,
+              child: StreamBuilder(
+                stream: OrderService.instance.myOrders(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(Sr.rLg),
+                        border: Border.all(color: cs.outline),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Unable to load orders',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.55),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (!snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  final docs = snapshot.data!.docs;
+
+                  if (docs.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(Sr.rLg),
+                        border: Border.all(color: cs.outline),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'No orders yet',
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data();
+                      final status = data['status'] ?? 'pending';
+
+                      Color statusColor;
+                      IconData icon;
+
+                      switch (status) {
+                        case 'approved':
+                          statusColor = Colors.blue;
+                          icon = Icons.verified_rounded;
+                          break;
+                        case 'packed':
+                          statusColor = Colors.orange;
+                          icon = Icons.inventory_2_rounded;
+                          break;
+                        case 'to_receive':
+                          statusColor = Colors.green;
+                          icon = Icons.local_shipping_rounded;
+                          break;
+                        default:
+                          statusColor = SoilColors.clay;
+                          icon = Icons.schedule_rounded;
+                      }
+
+                      return Container(
+                        width: 240,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(Sr.rLg),
+                          border: Border.all(color: cs.outline),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(icon, color: statusColor, size: 18),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(Sr.rPill),
+                                  ),
+                                  child: Text(
+                                    status
+                                        .toUpperCase()
+                                        .replaceAll('_', ' '),
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              '₱${data['total']}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: SoilColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Expanded(
+                              child: Text(
+                                (data['items'] as List)
+                                    .map((e) => '${e['qty']}x ${e['name']}')
+                                    .join('\n'),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: cs.onSurface.withOpacity(0.65),
+                                  height: 1.45,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
 
@@ -944,7 +1110,42 @@ class _CartSheet extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    try {
+                      Fluttertoast.showToast(
+                        msg: 'Processing order...',
+                        gravity: ToastGravity.CENTER,
+                        toastLength: Toast.LENGTH_SHORT,
+                      );
+
+                      await OrderService.instance.placeOrder(
+                        items: cart
+                            .map((e) => {
+                          'name': e.label,
+                          'price': e.price,
+                          'qty': e.qty,
+                        })
+                            .toList(),
+                        total: total,
+                      );
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+
+                        Fluttertoast.showToast(
+                          msg: 'Order placed successfully',
+                          gravity: ToastGravity.CENTER,
+                        );
+                      }
+
+                      cart.clear();
+                    } catch (e) {
+                      Fluttertoast.showToast(
+                        msg: e.toString(),
+                        gravity: ToastGravity.CENTER,
+                      );
+                    }
+                  },
                   child: const Text('Place Order'),
                 ),
               ),

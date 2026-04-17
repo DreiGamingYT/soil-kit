@@ -1,12 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'screens/home_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+
+import 'screens/auth_gate.dart';
 import 'services/settings_service.dart';
 
-void main() {
+// If you used FlutterFire CLI, uncomment this:
+// import 'firebase_options.dart';
+
+Future<void> main() async {
   WidgetsBinding binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+
+  await Firebase.initializeApp(
+    // If you used FlutterFire CLI, use this instead:
+    // options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const SoilApp());
 }
 
@@ -14,34 +25,28 @@ void main() {
 class SoilColors {
   SoilColors._();
 
-  // Greens
-  static const primary      = Color(0xFF3A5C38);  // deep moss
-  static const primaryMid   = Color(0xFF5A8A55);  // sage green
-  static const primaryLight = Color(0xFFDCEBD9);  // mint wash
-  static const primaryDark  = Color(0xFF7DB878);  // light leaf (dark mode accent)
+  static const primary      = Color(0xFF3A5C38);
+  static const primaryMid   = Color(0xFF5A8A55);
+  static const primaryLight = Color(0xFFDCEBD9);
+  static const primaryDark  = Color(0xFF7DB878);
 
-  // Backgrounds — warm linen & cream
-  static const bgLight      = Color(0xFFF4EFE6);  // warm linen
-  static const bgDark       = Color(0xFF131A11);  // deep forest
+  static const bgLight      = Color(0xFFF4EFE6);
+  static const bgDark       = Color(0xFF131A11);
 
-  // Surfaces
-  static const surfaceLight      = Color(0xFFFEFCF7);  // warm white
-  static const surfaceDark       = Color(0xFF1C2A1A);  // dark moss
-  static const surfaceElevLight  = Color(0xFFEDE6D9);  // warm sand
-  static const surfaceElevDark   = Color(0xFF243222);  // deep sage
+  static const surfaceLight      = Color(0xFFFEFCF7);
+  static const surfaceDark       = Color(0xFF1C2A1A);
+  static const surfaceElevLight  = Color(0xFFEDE6D9);
+  static const surfaceElevDark   = Color(0xFF243222);
 
-  // Borders
   static const borderLight = Color(0xFFD9D0C3);
   static const borderDark  = Color(0xFF293D27);
 
-  // Earthy accents
-  static const clay    = Color(0xFFA07558);  // terracotta clay
-  static const harvest = Color(0xFFBF903E);  // harvest gold
+  static const clay    = Color(0xFFA07558);
+  static const harvest = Color(0xFFBF903E);
 
-  // Nutrient status — earthy versions
-  static const low    = Color(0xFFB84B38);  // clay red
-  static const medium = Color(0xFFBF903E);  // harvest amber
-  static const high   = Color(0xFF4A8A46);  // leaf green
+  static const low    = Color(0xFFB84B38);
+  static const medium = Color(0xFFBF903E);
+  static const high   = Color(0xFF4A8A46);
 }
 
 class Sr {
@@ -68,7 +73,7 @@ class SoilApp extends StatelessWidget {
           themeMode: mode,
           theme: _light(),
           darkTheme: _dark(),
-          home: const MainScaffold(),
+          home: const AuthGate(),
         ),
       ),
     );
@@ -244,27 +249,5 @@ class SoilApp extends StatelessWidget {
             : const Color(0xFF2A2A2A),
       ),
     ),
-  );
-}
-
-class MainScaffold extends StatefulWidget {
-  const MainScaffold({super.key});
-  @override
-  State<MainScaffold> createState() => _MainScaffoldState();
-}
-
-class _MainScaffoldState extends State<MainScaffold> {
-  int _selectedIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => FlutterNativeSplash.remove());
-  }
-
-  @override
-  Widget build(BuildContext context) => HomeScreen(
-    selectedIndex: _selectedIndex,
-    onNavTap: (i) => setState(() => _selectedIndex = i),
   );
 }
