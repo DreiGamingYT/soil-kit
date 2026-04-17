@@ -1,4 +1,4 @@
-import 'soil_result.dart';
+import '../models/soil_result.dart';
 
 /// Simple in-memory singleton that keeps results & notes alive across screens.
 class SoilDataService {

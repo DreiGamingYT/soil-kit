@@ -1,303 +1,405 @@
 import 'package:flutter/material.dart';
-import '../models/settings_service.dart';
+import '../services/settings_service.dart';
+import '../main.dart';
 import '../widgets/bottom_nav.dart';
+import 'camera_screen.dart';
 import 'color_chart_screen.dart';
-import 'history_screen.dart';
-import 'notes_screen.dart';
 import 'soil_list_screen.dart';
+import 'shop_screen.dart';
+import 'notes_screen.dart';
 import 'profile_screen.dart';
-import 'faq_screen.dart';
-import 'help_guide_screen.dart';
-import 'settings_screen.dart';
+import 'history_screen.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomeScreen extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onNavTap;
-  const HomeScreen({super.key, required this.selectedIndex, required this.onNavTap});
+
+  const HomeScreen({
+    super.key,
+    required this.selectedIndex,
+    required this.onNavTap,
+  });
+
+  Widget _pageForIndex(int index) {
+    switch (index) {
+      case 1:
+        return const ColorChartScreen(showBottomNav: false);
+      case 2:
+        return const SoilListScreen(showBottomNav: false);
+      case 3:
+        return const ShopScreen(showBottomNav: false);
+      case 4:
+        return const NotesScreen(showBottomNav: false);
+      case 5:
+        return const HistoryScreen(showBottomNav: false);
+      default:
+        return const _HomeBody();
+    }
+  }
+
+  void _showCameraSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CameraOptionsSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: SettingsService.instance.language,
       builder: (_, __, ___) => Scaffold(
-        body: selectedIndex == 2 ? const ProfileScreen() : const _HomeBody(),
-        bottomNavigationBar: AppBottomNav(selectedIndex: selectedIndex, onTap: onNavTap),
+        body: _pageForIndex(selectedIndex),
+        bottomNavigationBar: AppBottomNav(
+          selectedIndex: selectedIndex,
+          isDashboardSelected: selectedIndex == 5,
+          onTap: (i) {
+            if (i == 2 && selectedIndex != 2) {
+              onNavTap(i);
+            } else {
+              onNavTap(i);
+            }
+          },
+          onDashboardTap: () => onNavTap(5),
+        ),
       ),
     );
   }
 }
 
-class _HomeBody extends StatefulWidget {
-  const _HomeBody();
+// ── Camera Options Sheet ──────────────────────────────────────────────────────
+class _CameraOptionsSheet extends StatelessWidget {
   @override
-  State<_HomeBody> createState() => _HomeBodyState();
+  Widget build(BuildContext context) {
+    final cs    = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bot   = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? SoilColors.surfaceDark : SoilColors.surfaceLight,
+        borderRadius:
+        const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bot + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.outline,
+                borderRadius: BorderRadius.circular(Sr.rPill),
+              ),
+            ),
+          ),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [SoilColors.primary, SoilColors.primaryMid],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.eco_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Analyze Soil',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Upload an existing image\nto get instant soil analysis.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: cs.onSurface.withOpacity(0.48),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          _OptionTile(
+            icon: Icons.photo_library_outlined,
+            title: 'Upload from Gallery',
+            subtitle: 'Choose a photo from your gallery',
+            color: SoilColors.harvest,
+            onTap: () async {
+              Navigator.pop(context);
+
+              final picker = ImagePicker();
+              final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+              if (pickedFile != null) {
+                // Send the image to your analysis screen or process it here
+                // Example:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CameraScreen(), // replace with your image preview/analyze screen
+                  ),
+                );
+              }
+            },
+          ),
+
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
 }
 
-class _HomeBodyState extends State<_HomeBody> {
-  final _searchCtrl = TextEditingController();
-  String _query = '';
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final Color color;
+  final VoidCallback onTap;
 
-  List<Map<String, dynamic>> _items(SettingsService s) => [
-    {'label': s.tr('color_chart'), 'icon': Icons.palette_outlined,  'screen': 'color_chart'},
-    {'label': s.tr('history'),     'icon': Icons.history_rounded,    'screen': 'history'},
-    {'label': s.tr('soil_list'),   'icon': Icons.terrain_outlined,   'screen': 'soil_list'},
-    {'label': s.tr('notes'),       'icon': Icons.edit_note_rounded,  'screen': 'notes'},
-    {'label': s.tr('faq'),         'icon': Icons.help_outline_rounded,'screen': 'faq'},
-    {'label': s.tr('help_guide'),  'icon': Icons.menu_book_outlined, 'screen': 'help'},
-    {'label': s.tr('settings'),    'icon': Icons.tune_rounded,       'screen': 'settings'},
-  ];
-
-  void _go(BuildContext ctx, String screen) {
-    Widget? d;
-    switch (screen) {
-      case 'color_chart': d = const ColorChartScreen(); break;
-      case 'history':     d = const HistoryScreen(); break;
-      case 'soil_list':   d = const SoilListScreen(); break;
-      case 'notes':       d = const NotesScreen(); break;
-      case 'faq':         d = const FaqScreen(); break;
-      case 'help':        d = const HelpGuideScreen(); break;
-      case 'settings':    d = const SettingsScreen(); break;
-    }
-    if (d != null) {
-      setState(() { _query = ''; _searchCtrl.clear(); });
-      Navigator.push(ctx, MaterialPageRoute(builder: (_) => d!));
-    }
-  }
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final s = SettingsService.instance;
     final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(Sr.rMd),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: cs.onSurface.withOpacity(0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: color.withOpacity(0.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Home Body ─────────────────────────────────────────────────────────────────
+class _HomeBody extends StatelessWidget {
+  const _HomeBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final s   = SettingsService.instance;
+    final cs  = Theme.of(context).colorScheme;
     final top = MediaQuery.of(context).padding.top;
 
-    return ValueListenableBuilder<String>(
-      valueListenable: s.language,
-      builder: (_, __, ___) {
-        final items = _items(s);
-        final results = _query.isEmpty ? <Map<String, dynamic>>[] :
-        items.where((i) => i['label'].toString().toLowerCase()
-            .contains(_query.toLowerCase())).toList();
-
-        return CustomScrollView(slivers: [
-          // ── Header ──────────────────────────────────────────────────
-          SliverToBoxAdapter(child: Container(
-            padding: EdgeInsets.fromLTRB(24, top + 20, 24, 20),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(s.tr('hello'),
-                      style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.45),
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 2),
-                  Text(s.tr('username'),
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800,
-                          letterSpacing: -0.8, color: cs.onSurface)),
-                ])),
-                // Notification button
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, top > 0 ? 8 : 18, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Top bar ─────────────────────────────────────────
+            Row(
+              children: [
                 GestureDetector(
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  ),
                   child: Container(
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                        color: cs.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: cs.outline.withOpacity(0.4))),
-                    child: Icon(Icons.notifications_none_rounded,
-                        color: cs.onSurface.withOpacity(0.6), size: 22),
+                      color: cs.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: cs.outline),
+                    ),
+                    child: Icon(
+                      Icons.person_rounded,
+                      color: cs.onSurface.withOpacity(0.55),
+                      size: 22,
+                    ),
                   ),
                 ),
-              ]),
-              const SizedBox(height: 20),
-              // Search bar
-              Container(
-                height: 48,
-                decoration: BoxDecoration(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.tr('hello'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withOpacity(0.45),
+                        ),
+                      ),
+                      Text(
+                        s.tr('username'),
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
                     color: cs.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: cs.outline.withOpacity(0.4))),
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _query = v),
-                  style: TextStyle(fontSize: 14, color: cs.onSurface),
-                  decoration: InputDecoration(
-                      hintText: s.tr('search'),
-                      hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.35), fontSize: 14),
-                      prefixIcon: Icon(Icons.search_rounded,
-                          color: cs.onSurface.withOpacity(0.35), size: 20),
-                      suffixIcon: _query.isNotEmpty ? IconButton(
-                          icon: Icon(Icons.close_rounded,
-                              color: cs.onSurface.withOpacity(0.35), size: 18),
-                          onPressed: () => setState(() { _query=''; _searchCtrl.clear(); }))
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14)),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.outline),
+                  ),
+                  child: Icon(
+                    Icons.notifications_none_rounded,
+                    color: cs.onSurface.withOpacity(0.55),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Hero banner ─────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [SoilColors.primary, SoilColors.primaryMid],
+                ),
+                borderRadius: BorderRadius.circular(Sr.rXl),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Tap the scan button below to analyze your soil.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                    ),
+                  ),
+                  const Icon(Icons.eco, color: Colors.white),
+                ],
+              ),
+            ),
+
+            // ── CENTER AREA ─────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: Builder(
+                  builder: (ctx) => GestureDetector(
+                    onTap: () => showModalBottomSheet(
+                      context: ctx,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _CameraOptionsSheet(),
+                    ),
+                    child: Container(
+                      width: 132,
+                      height: 132,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [SoilColors.primary, SoilColors.primaryMid],
+                        ),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.camera_alt_rounded,
+                              color: Colors.white, size: 48),
+                          SizedBox(height: 8),
+                          Text('SCAN',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ]),
-          )),
+            ),
 
-          // ── Search results ───────────────────────────────────────────
-          if (_query.isNotEmpty) SliverToBoxAdapter(child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: results.isEmpty
-                ? Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: cs.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cs.outline.withOpacity(0.3))),
-                child: Text(s.tr('no_results'),
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.4), fontSize: 14)))
-                : Column(children: results.map((item) => _SearchResult(
-                item: item, onTap: () => _go(context, item['screen']))).toList()),
-          )),
+            // ── Bottom button ───────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Upload from Gallery'),
+                onPressed: () async {
+                  final picker = ImagePicker();
+                  final pickedFile =
+                  await picker.pickImage(source: ImageSource.gallery);
 
-          if (_query.isEmpty) ...[
-            // ── Quick action strip ───────────────────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  _QuickChip(icon: Icons.help_outline_rounded,
-                      label: s.tr('faq'),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const FaqScreen()))),
-                  const SizedBox(width: 8),
-                  _QuickChip(icon: Icons.menu_book_outlined,
-                      label: s.tr('help_guide'),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const HelpGuideScreen()))),
-                  const SizedBox(width: 8),
-                  _QuickChip(icon: Icons.tune_rounded,
-                      label: s.tr('settings'),
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-                ]),
-              ),
-            )),
-
-            // ── Section label ────────────────────────────────────────
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
-              child: Text('Features',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6, color: cs.onSurface.withOpacity(0.4))),
-            )),
-
-            // ── Feature grid ─────────────────────────────────────────
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              sliver: SliverGrid(
-                delegate: SliverChildListDelegate([
-                  _FeatureCard(emoji: '🎨', label: s.tr('color_chart'),
-                      sublabel: 'pH & NPK ranges',
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const ColorChartScreen()))),
-                  _FeatureCard(emoji: '📋', label: s.tr('history'),
-                      sublabel: 'Past analyses',
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const HistoryScreen()))),
-                  _FeatureCard(emoji: '🌍', label: s.tr('soil_list'),
-                      sublabel: '6 soil types',
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const SoilListScreen()))),
-                  _FeatureCard(emoji: '📝', label: s.tr('notes'),
-                      sublabel: 'Field notes',
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const NotesScreen()))),
-                ]),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, crossAxisSpacing: 12,
-                    mainAxisSpacing: 12, childAspectRatio: 1.4),
+                  if (pickedFile != null) {
+                    // handle image
+                  }
+                },
               ),
             ),
           ],
-        ]);
-      },
-    );
-  }
-}
-
-// ── Widgets ───────────────────────────────────────────────────────────────────
-
-class _SearchResult extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final VoidCallback onTap;
-  const _SearchResult({required this.item, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(color: cs.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: cs.outline.withOpacity(0.3))),
-        child: Row(children: [
-          Icon(item['icon'] as IconData, size: 20, color: const Color(0xFF2C5F2E)),
-          const SizedBox(width: 12),
-          Text(item['label'] as String,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
-          const Spacer(),
-          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: cs.onSurface.withOpacity(0.3)),
-        ]),
-      ),
-    );
-  }
-}
-
-class _QuickChip extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap;
-  const _QuickChip({required this.icon, required this.label, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(color: cs.surface,
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: cs.outline.withOpacity(0.4))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: const Color(0xFF2C5F2E)),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-              color: cs.onSurface.withOpacity(0.75))),
-        ]),
-      ),
-    );
-  }
-}
-
-class _FeatureCard extends StatelessWidget {
-  final String emoji, label, sublabel; final VoidCallback onTap;
-  const _FeatureCard({required this.emoji, required this.label,
-    required this.sublabel, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cs.outline.withOpacity(0.3)),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(emoji, style: const TextStyle(fontSize: 26)),
-          const Spacer(),
-          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-              color: cs.onSurface, letterSpacing: -0.2)),
-          const SizedBox(height: 2),
-          Text(sublabel, style: TextStyle(fontSize: 11,
-              color: cs.onSurface.withOpacity(0.4))),
-        ]),
       ),
     );
   }

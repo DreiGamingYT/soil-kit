@@ -14,13 +14,18 @@ import '../services/soil_logic_service.dart';
 import 'camera_result_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Soil detection state
+//  Enums
 // ─────────────────────────────────────────────────────────────────────────────
+
 enum _DetectState { scanning, soilFound, noSoil }
+
+/// Live capture quality issues reported in real-time (Feature 5).
+enum _QualityIssue { none, tooDark, tooBright, blurry }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  CameraScreen
 // ─────────────────────────────────────────────────────────────────────────────
+
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
   @override
@@ -29,6 +34,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen>
     with TickerProviderStateMixin {
+
   // ── Camera ────────────────────────────────────────────────────────────────
   CameraController? _ctrl;
   List<CameraDescription> _cameras = [];
@@ -37,32 +43,40 @@ class _CameraScreenState extends State<CameraScreen>
   String _errorMsg = '';
   bool _torchOn = false;
 
-  // ── Soil detection via image stream ───────────────────────────────────────
+  // ── Soil detection ────────────────────────────────────────────────────────
   _DetectState _detectState = _DetectState.scanning;
   double _soilConfidence = 0.0;
   int _frameCount = 0;
   static const int _kSampleEvery = 20;
   bool _streamProcessing = false;
 
+  // ── Live quality feedback (Feature 5) ─────────────────────────────────────
+  _QualityIssue _qualityIssue  = _QualityIssue.none;
+  double        _brightness    = 0.5;   // 0–1 normalised Y average
+  double        _frameVariance = 500.0; // Y-channel variance; low = blurry
+
   // ── Capture / analyse ─────────────────────────────────────────────────────
   bool _isCapturing = false;
   bool _isAnalyzing = false;
-  // Human-readable status shown on the analysing overlay
   String _analyzeStatus = 'Reading colour values…';
+
+  // ── White reference (Feature 3) ───────────────────────────────────────────
+  List<double>? _whiteRef;
 
   // ── Animations ────────────────────────────────────────────────────────────
   late AnimationController _pulseCtrl;
   late AnimationController _scanLineCtrl;
-  late Animation<double> _scanLineAnim;
+  late Animation<double>   _scanLineAnim;
   late AnimationController _cornerCtrl;
-  late Animation<double> _cornerAnim;
+  late Animation<double>   _cornerAnim;
 
   // ── Services ──────────────────────────────────────────────────────────────
-  final _imgService = ImageAnalysisService();
-  final _calService = CalibrationService();
+  final _imgService   = ImageAnalysisService();
+  final _calService   = CalibrationService();
   final _logicService = SoilLogicService();
 
   // ─────────────────────────────────────────────────────────────────────────
+
   Color get _stateColor {
     switch (_detectState) {
       case _DetectState.soilFound: return const Color(0xFF4CAF50);
@@ -76,6 +90,35 @@ class _CameraScreenState extends State<CameraScreen>
       case _DetectState.soilFound: return 'Soil Detected  ✓';
       case _DetectState.noSoil:   return 'No soil — aim at sample';
       case _DetectState.scanning: return 'Scanning…';
+    }
+  }
+
+  // ── Quality helpers (Feature 5) ───────────────────────────────────────────
+
+  Color get _qualityColor {
+    switch (_qualityIssue) {
+      case _QualityIssue.tooDark:   return Colors.orange;
+      case _QualityIssue.tooBright: return Colors.amber;
+      case _QualityIssue.blurry:    return Colors.red;
+      case _QualityIssue.none:      return Colors.green;
+    }
+  }
+
+  String get _qualityLabel {
+    switch (_qualityIssue) {
+      case _QualityIssue.tooDark:   return 'Too dark — add light';
+      case _QualityIssue.tooBright: return 'Too bright — reduce glare';
+      case _QualityIssue.blurry:    return 'Blurry — hold steady';
+      case _QualityIssue.none:      return 'Lighting OK';
+    }
+  }
+
+  IconData get _qualityIcon {
+    switch (_qualityIssue) {
+      case _QualityIssue.tooDark:   return Icons.dark_mode_outlined;
+      case _QualityIssue.tooBright: return Icons.wb_sunny_outlined;
+      case _QualityIssue.blurry:    return Icons.blur_on_outlined;
+      case _QualityIssue.none:      return Icons.check_circle_outline;
     }
   }
 
@@ -100,6 +143,7 @@ class _CameraScreenState extends State<CameraScreen>
         CurvedAnimation(parent: _cornerCtrl, curve: Curves.easeOut);
 
     _initCamera();
+    _loadWhiteRef();
   }
 
   @override
@@ -112,10 +156,26 @@ class _CameraScreenState extends State<CameraScreen>
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Camera init
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Load white reference ──────────────────────────────────────────────────
+
+  Future<void> _loadWhiteRef() async {
+    final ref = await _calService.loadWhiteReference();
+    if (mounted) setState(() => _whiteRef = ref);
+  }
+
+  // ── Camera init ───────────────────────────────────────────────────────────
+
   Future<void> _initCamera() async {
+    // camera plugin only supports Android & iOS
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      if (mounted) {
+        setState(() {
+          _camError = true;
+          _errorMsg = 'Camera is not supported on this platform.\nUse the Gallery option to select a photo.';
+        });
+      }
+      return;
+    }
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
@@ -145,9 +205,8 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Image stream — lightweight soil detection (unchanged)
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Image stream ──────────────────────────────────────────────────────────
+
   void _startImageStream() {
     _ctrl?.startImageStream((CameraImage frame) {
       _frameCount++;
@@ -169,6 +228,7 @@ class _CameraScreenState extends State<CameraScreen>
       final y1 = (h * 0.70).toInt();
 
       double r = 128, g = 128, b = 128;
+      double yAvgVal = 128.0;
 
       final fmt = frame.format.group;
 
@@ -188,31 +248,46 @@ class _CameraScreenState extends State<CameraScreen>
           }
         }
         if (cnt > 0) { r = rS / cnt; g = gS / cnt; b = bS / cnt; }
+        yAvgVal = (0.2126 * r + 0.7152 * g + 0.0722 * b);
       } else {
+        // YUV — compute from Y plane
         final yPlane = frame.planes[0];
-        double yS = 0;
+        double yS = 0, varS = 0;
         int yCnt = 0;
+
         for (int py = y0; py < y1; py += 6) {
           for (int px = x0; px < x1; px += 6) {
             final i = py * yPlane.bytesPerRow + px;
             if (i < yPlane.bytes.length) {
-              yS += yPlane.bytes[i] & 0xFF;
+              final yv = yPlane.bytes[i] & 0xFF;
+              yS += yv;
               yCnt++;
             }
           }
         }
-        final yAvg = yCnt > 0 ? yS / yCnt : 128.0;
+
+        yAvgVal = yCnt > 0 ? yS / yCnt : 128.0;
+
+        // Second pass for variance (blur detection) — Feature 5
+        for (int py = y0; py < y1; py += 6) {
+          for (int px = x0; px < x1; px += 6) {
+            final i = py * yPlane.bytesPerRow + px;
+            if (i < yPlane.bytes.length) {
+              final diff = (yPlane.bytes[i] & 0xFF) - yAvgVal;
+              varS += diff * diff;
+            }
+          }
+        }
+
+        final variance = yCnt > 0 ? varS / yCnt : 500.0;
 
         double uAvg = 128.0, vAvg = 128.0;
-
         if (frame.planes.length >= 2) {
           final plane1 = frame.planes[1];
           final pixStride = plane1.bytesPerPixel ?? 1;
           final interleaved = pixStride == 2;
-
           double u1S = 0, v1S = 0;
           int uvCnt = 0;
-
           for (int py = y0 ~/ 2; py < y1 ~/ 2; py += 3) {
             for (int px = x0 ~/ 2; px < x1 ~/ 2; px += 3) {
               if (interleaved) {
@@ -238,16 +313,34 @@ class _CameraScreenState extends State<CameraScreen>
               }
             }
           }
-
-          if (uvCnt > 0) {
-            uAvg = u1S / uvCnt;
-            vAvg = v1S / uvCnt;
-          }
+          if (uvCnt > 0) { uAvg = u1S / uvCnt; vAvg = v1S / uvCnt; }
         }
 
-        r = (yAvg + 1.402  * (vAvg - 128)).clamp(0, 255).toDouble();
-        g = (yAvg - 0.344  * (uAvg - 128) - 0.714 * (vAvg - 128)).clamp(0, 255).toDouble();
-        b = (yAvg + 1.772  * (uAvg - 128)).clamp(0, 255).toDouble();
+        r = (yAvgVal + 1.402  * (vAvg - 128)).clamp(0, 255).toDouble();
+        g = (yAvgVal - 0.344  * (uAvg - 128) - 0.714 * (vAvg - 128)).clamp(0, 255).toDouble();
+        b = (yAvgVal + 1.772  * (uAvg - 128)).clamp(0, 255).toDouble();
+
+        // ── Feature 5: update quality metrics ─────────────────────────────
+        if (mounted) {
+          final bNorm = yAvgVal / 255.0;
+          _QualityIssue issue;
+          if (bNorm < 0.15)      issue = _QualityIssue.tooDark;
+          else if (bNorm > 0.90) issue = _QualityIssue.tooBright;
+          else if (variance < 100) issue = _QualityIssue.blurry;
+          else                   issue = _QualityIssue.none;
+
+          // Only call setState if something changed to avoid unnecessary
+          // rebuilds every 20 frames.
+          if (issue != _qualityIssue ||
+              (bNorm - _brightness).abs() > 0.05 ||
+              (variance - _frameVariance).abs() > 50) {
+            setState(() {
+              _brightness    = bNorm;
+              _frameVariance = variance;
+              _qualityIssue  = issue;
+            });
+          }
+        }
       }
 
       final confidence = _calcSoilConfidence(r, g, b);
@@ -292,10 +385,9 @@ class _CameraScreenState extends State<CameraScreen>
     final s = maxC == 0 ? 0.0 : delta / maxC;
 
     double score = 0.0;
-
-    if (h >= 0 && h <= 90)        score += 0.40;
-    else if (h > 90 && h <= 120)  score += 0.15;
-    else if (h > 300)              score += 0.20;
+    if (h >= 0 && h <= 90)       score += 0.40;
+    else if (h > 90 && h <= 120) score += 0.15;
+    else if (h > 300)            score += 0.20;
 
     if (r >= g && g >= b)       score += 0.30;
     else if (r >= g)            score += 0.18;
@@ -309,9 +401,8 @@ class _CameraScreenState extends State<CameraScreen>
     return score.clamp(0.0, 1.0);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Torch
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Torch ─────────────────────────────────────────────────────────────────
+
   Future<void> _toggleTorch() async {
     if (_ctrl == null || !_camReady) return;
     final next = !_torchOn;
@@ -321,9 +412,8 @@ class _CameraScreenState extends State<CameraScreen>
     } catch (_) {}
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Capture
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Capture ───────────────────────────────────────────────────────────────
+
   Future<void> _capture() async {
     if (_ctrl == null || !_camReady || _isCapturing || _isAnalyzing) return;
     if (_detectState != _DetectState.soilFound) {
@@ -369,9 +459,8 @@ class _CameraScreenState extends State<CameraScreen>
     ));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Gallery fallback
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Gallery ───────────────────────────────────────────────────────────────
+
   Future<void> _pickFromGallery() async {
     try {
       final picker = ImagePicker();
@@ -391,27 +480,26 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  ── REAL ANALYSIS PIPELINE ───────────────────────────────────────────────
+  // ── Analysis pipeline ─────────────────────────────────────────────────────
   //
-  //  Step 1: Extract average RGB from the captured image
-  //  Step 2: Load saved calibration data
-  //  Step 3: Match each nutrient level via colour distance
-  //  Step 4: Compute score + health label + recommendations
-  //  Step 5: Build SoilResult and navigate to CameraResultScreen
-  //
-  //  Fallback: if no calibration exists, fall back to a heuristic estimate
-  //  so the app is still usable before calibration is done.
+  //  Changes vs original:
+  //   • Passes _whiteRef to getAverageRGB for white-patch correction (Feat 3)
+  //   • Uses _logicService.score(n, p, k, ph: ph) — pH-weighted (Feat 4)
+  //   • Score normalisation updated to 4–12 range (Feat 4)
   // ─────────────────────────────────────────────────────────────────────────
+
   Future<void> _analyzeImage(File file) async {
     if (!mounted) return;
 
     try {
-      // ── Step 1: Read RGB ─────────────────────────────────────────────────
+      // Step 1: Read RGB with white-patch correction (Feature 3)
       _setStatus('Reading colour values…');
-      final sampleRGB = await _imgService.getAverageRGB(file.path);
+      final sampleRGB = await _imgService.getAverageRGB(
+        file.path,
+        whiteRef: _whiteRef,
+      );
 
-      // ── Step 2: Load calibration ─────────────────────────────────────────
+      // Step 2: Load calibration
       _setStatus('Loading calibration data…');
       final calibrationRaw = await _calService.loadCalibration();
 
@@ -419,16 +507,12 @@ class _CameraScreenState extends State<CameraScreen>
       double ph;
 
       if (calibrationRaw != null && calibrationRaw.isNotEmpty) {
-        // ── Step 3: Match nutrients ────────────────────────────────────────
         _setStatus('Matching nutrient levels…');
-
         nitrogenLevel   = _matchNutrient(sampleRGB, calibrationRaw, 'Nitrogen');
         phosphorusLevel = _matchNutrient(sampleRGB, calibrationRaw, 'Phosphorus');
         potassiumLevel  = _matchNutrient(sampleRGB, calibrationRaw, 'Potassium');
         ph              = _matchPh(sampleRGB, calibrationRaw);
-
       } else {
-        // ── Fallback: heuristic from raw RGB when no calibration exists ────
         _setStatus('No calibration found — using heuristic…');
         final result = _heuristicEstimate(sampleRGB);
         nitrogenLevel   = result['n']!;
@@ -437,24 +521,29 @@ class _CameraScreenState extends State<CameraScreen>
         ph              = double.parse(result['ph']!);
       }
 
-      // ── Step 4: Score + status ───────────────────────────────────────────
+      // Step 3: pH-weighted score (Feature 4)
+      // Range 4–12 (NPK 3–9 + pH 1–3) → normalised to 0–100 %
       _setStatus('Computing soil health score…');
-      final rawScore    = _logicService.score(nitrogenLevel, phosphorusLevel, potassiumLevel);
-      // Normalise 3–9 range → 0–100 %
-      final overallScore = (((rawScore - 3) / 6) * 100).clamp(0, 100).toDouble();
+      final rawScore = _logicService.score(
+        nitrogenLevel,
+        phosphorusLevel,
+        potassiumLevel,
+        ph: ph,
+      );
+      final overallScore = (((rawScore - 4) / 8) * 100).clamp(0, 100).toDouble();
       final status = _statusLabel(overallScore);
 
-      // ── Step 5: Navigate ─────────────────────────────────────────────────
+      // Step 4: Navigate
       final soilResult = SoilResult(
-        soilType: _inferSoilType(nitrogenLevel, phosphorusLevel, potassiumLevel, ph),
-        date: DateTime.now(),
-        overallScore: overallScore,
-        status: status,
-        nitrogenLevel: nitrogenLevel,
+        soilType:        _inferSoilType(nitrogenLevel, phosphorusLevel, potassiumLevel, ph),
+        date:            DateTime.now(),
+        overallScore:    overallScore,
+        status:          status,
+        nitrogenLevel:   nitrogenLevel,
         phosphorusLevel: phosphorusLevel,
-        potassiumLevel: potassiumLevel,
-        ph: double.parse(ph.toStringAsFixed(1)),
-        imagePath: file.path,
+        potassiumLevel:  potassiumLevel,
+        ph:              double.parse(ph.toStringAsFixed(1)),
+        imagePath:       file.path,
       );
 
       if (!mounted) return;
@@ -467,7 +556,6 @@ class _CameraScreenState extends State<CameraScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isAnalyzing = false);
-      // Restart stream so the user can try again
       try { _startImageStream(); } catch (_) {}
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Analysis failed: $e'),
@@ -477,23 +565,19 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Helpers
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   void _setStatus(String msg) {
     if (mounted) setState(() => _analyzeStatus = msg);
   }
 
-  /// Match a single nutrient from calibration data.
-  /// calibrationRaw shape: { 'Nitrogen': { 'LOW': [r,g,b], 'MEDIUM': [...], 'HIGH': [...] }, … }
   String _matchNutrient(
       List<double> sampleRGB,
       Map<String, dynamic> calibrationRaw,
       String nutrient,
       ) {
     final nutrientData = calibrationRaw[nutrient];
-    if (nutrientData == null) return 'Medium'; // safe default
+    if (nutrientData == null) return 'Medium';
 
     final levels = Map<String, List<double>>.fromEntries(
       (nutrientData as Map<String, dynamic>).entries.map((e) {
@@ -503,18 +587,14 @@ class _CameraScreenState extends State<CameraScreen>
     );
 
     final matched = _imgService.matchLevel(sampleRGB, levels, threshold: 80);
-
-    // Normalise casing: calibration keys may be 'LOW'/'MEDIUM'/'HIGH'
-    // but SoilResult + UI expect 'Low'/'Medium'/'High'
     switch (matched.toUpperCase()) {
       case 'HIGH':   return 'High';
       case 'MEDIUM': return 'Medium';
       case 'LOW':    return 'Low';
-      default:       return 'Medium'; // UNKNOWN → safe middle ground
+      default:       return 'Medium';
     }
   }
 
-  /// Estimate pH from calibration pH data (if present), or derive from RGB hue.
   double _matchPh(List<double> sampleRGB, Map<String, dynamic> calibrationRaw) {
     final phData = calibrationRaw['pH'];
     if (phData != null) {
@@ -526,17 +606,15 @@ class _CameraScreenState extends State<CameraScreen>
       );
       final matched = _imgService.matchLevel(sampleRGB, levels, threshold: 80);
       switch (matched.toUpperCase()) {
-        case 'LOW':    return 5.0; // acidic
-        case 'MEDIUM': return 6.5; // neutral-ish
-        case 'HIGH':   return 8.0; // alkaline
+        case 'LOW':    return 5.0;
+        case 'MEDIUM': return 6.5;
+        case 'HIGH':   return 8.0;
         default:       return 6.5;
       }
     }
-    // Fallback: hue-based pH estimate
     return _phFromRgb(sampleRGB[0], sampleRGB[1], sampleRGB[2]);
   }
 
-  /// Heuristic pH estimate from hue (used when no calibration).
   double _phFromRgb(double r, double g, double b) {
     final rf = r / 255, gf = g / 255, bf = b / 255;
     final maxC = [rf, gf, bf].reduce(math.max);
@@ -549,45 +627,28 @@ class _CameraScreenState extends State<CameraScreen>
       else                 h = 60 * (((rf - gf) / delta) + 4);
       if (h < 0) h += 360;
     }
-    // Red hues → acidic, green → neutral, blue/purple → alkaline
     if (h < 30 || h > 330)        return 4.5 + (h / 30).clamp(0, 1.5);
     if (h >= 30 && h <= 120)       return 6.0 + ((h - 30) / 90) * 1.5;
     if (h > 120 && h <= 240)       return 7.0 + ((h - 120) / 120) * 1.0;
     return 7.5;
   }
 
-  /// Heuristic nutrient estimate when no calibration data is available.
-  /// Uses relative RGB channel dominance as a rough proxy.
   Map<String, String> _heuristicEstimate(List<double> rgb) {
     final r = rgb[0], g = rgb[1], b = rgb[2];
     final total = r + g + b;
     final rN = total > 0 ? r / total : 0.33;
     final gN = total > 0 ? g / total : 0.33;
-
-    // N roughly correlates with green channel (chlorophyll proxy)
     final n = gN > 0.38 ? 'High' : gN > 0.30 ? 'Medium' : 'Low';
-    // P correlates inversely with redness
     final p = rN < 0.30 ? 'High' : rN < 0.38 ? 'Medium' : 'Low';
-    // K approximated from brightness
     final brightness = total / (3 * 255);
     final k = brightness > 0.60 ? 'High' : brightness > 0.35 ? 'Medium' : 'Low';
     final ph = _phFromRgb(r, g, b);
-
     return {'n': n, 'p': p, 'k': k, 'ph': ph.toStringAsFixed(1)};
   }
 
-  /// Infer a descriptive soil type name from the nutrient pattern + pH.
-  String _inferSoilType(String n, String p, String k, double ph) {
-    if (ph < 5.5) return 'Acidic Soil';
-    if (ph > 7.5) return 'Alkaline Soil';
-    if (n == 'High' && k == 'High') return 'Loamy Soil';
-    if (n == 'Low' && p == 'Low')   return 'Sandy Soil';
-    if (k == 'High' && p == 'High') return 'Clay Loam';
-    if (n == 'High' && p == 'Low')  return 'Silty Clay';
-    return 'Mixed Soil';
-  }
+  String _inferSoilType(String n, String p, String k, double ph) =>
+      _logicService.inferSoilType(n, p, k, ph);
 
-  /// Human-readable status label matching the 0–100 % score.
   String _statusLabel(double score) {
     if (score >= 70) return 'Good Nutrient Level';
     if (score >= 45) return 'Moderate Nutrient';
@@ -596,8 +657,9 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  Build (unchanged UI — only _analyzeStatus wired into the overlay)
+  //  Build
   // ─────────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final size   = MediaQuery.of(context).size;
@@ -613,7 +675,7 @@ class _CameraScreenState extends State<CameraScreen>
         backgroundColor: Colors.black,
         body: Stack(children: [
 
-          // ── Live preview ─────────────────────────────────────────────
+          // ── Live preview ────────────────────────────────────────────────
           if (_camReady && _ctrl != null)
             Positioned.fill(
               child: ClipRect(
@@ -654,12 +716,12 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             )),
 
-          // ── Scan line ─────────────────────────────────────────────────
+          // ── Scan line ───────────────────────────────────────────────────
           if (_camReady && !_isAnalyzing)
             AnimatedBuilder(
               animation: _scanLineAnim,
               builder: (_, __) {
-                final top = size.height * boxTopRatio;
+                final top  = size.height * boxTopRatio;
                 final boxH = size.height * boxHRatio;
                 return Positioned(
                   top: top + _scanLineAnim.value * boxH,
@@ -673,19 +735,17 @@ class _CameraScreenState extends State<CameraScreen>
                         _stateColor.withOpacity(0.85),
                         Colors.transparent,
                       ]),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _stateColor.withOpacity(0.45),
-                          blurRadius: 8,
-                        )
-                      ],
+                      boxShadow: [BoxShadow(
+                        color: _stateColor.withOpacity(0.45),
+                        blurRadius: 8,
+                      )],
                     ),
                   ),
                 );
               },
             ),
 
-          // ── Corner brackets ───────────────────────────────────────────
+          // ── Corner brackets ─────────────────────────────────────────────
           if (_camReady)
             Positioned(
               top: size.height * boxTopRatio,
@@ -703,7 +763,7 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             ),
 
-          // ── Status badge ──────────────────────────────────────────────
+          // ── Soil-detection badge ────────────────────────────────────────
           if (_camReady)
             Positioned(
               top: size.height * boxTopRatio - 44,
@@ -728,8 +788,8 @@ class _CameraScreenState extends State<CameraScreen>
                           width: 7, height: 7,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: _stateColor.withOpacity(
-                                0.5 + 0.5 * _pulseCtrl.value),
+                            color: _stateColor
+                                .withOpacity(0.5 + 0.5 * _pulseCtrl.value),
                           ),
                         ),
                       ),
@@ -747,13 +807,15 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             ),
 
-          // ── Soil confidence bar ───────────────────────────────────────
+          // ── Live quality feedback (Feature 5) ───────────────────────────
+          // Shown below the confidence bar so it's always visible.
           if (_camReady && !_isAnalyzing)
             Positioned(
-              bottom: botPad + 126,
+              bottom: botPad + 148,
               left: size.width * 0.06,
               right: size.width * 0.06,
               child: Column(children: [
+                // Soil confidence bar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -778,10 +840,69 @@ class _CameraScreenState extends State<CameraScreen>
                     valueColor: AlwaysStoppedAnimation(_stateColor),
                   ),
                 ),
+                const SizedBox(height: 10),
+
+                // ── Quality row ──────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Quality badge
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Container(
+                        key: ValueKey(_qualityIssue),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _qualityColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: _qualityColor.withOpacity(0.5),
+                              width: 1),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(_qualityIcon,
+                              color: _qualityColor, size: 12),
+                          const SizedBox(width: 5),
+                          Text(_qualityLabel,
+                              style: TextStyle(
+                                  color: _qualityColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                    ),
+
+                    // Brightness mini-bar
+                    Row(children: [
+                      Text('Brightness',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 10)),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 60,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: _brightness,
+                            minHeight: 4,
+                            backgroundColor: Colors.white12,
+                            valueColor: AlwaysStoppedAnimation(
+                              _qualityIssue == _QualityIssue.none
+                                  ? Colors.greenAccent
+                                  : _qualityColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
               ]),
             ),
 
-          // ── Analysing overlay — now shows live step status ─────────────
+          // ── Analysing overlay ────────────────────────────────────────────
           if (_isAnalyzing)
             Positioned.fill(
               child: Container(
@@ -801,7 +922,6 @@ class _CameraScreenState extends State<CameraScreen>
                             fontSize: 16,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
-                    // ── Live step label ────────────────────────────────
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
                       child: Text(
@@ -817,7 +937,7 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             ),
 
-          // ── Top bar ────────────────────────────────────────────────────
+          // ── Top bar ──────────────────────────────────────────────────────
           Positioned(
             top: 0, left: 0, right: 0,
             child: Container(
@@ -836,15 +956,35 @@ class _CameraScreenState extends State<CameraScreen>
                   child: Container(
                     width: 40, height: 40,
                     margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white12,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: const BoxDecoration(
+                        color: Colors.white12,
+                        shape: BoxShape.circle),
                     child: const Icon(Icons.close,
                         color: Colors.white, size: 20),
                   ),
                 ),
                 const Spacer(),
+                // White-ref indicator
+                if (_whiteRef != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.wb_auto,
+                          color: Colors.white70, size: 12),
+                      SizedBox(width: 4),
+                      Text('WB',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold)),
+                    ]),
+                  ),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 9, vertical: 4),
@@ -862,10 +1002,10 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // ── Hint text ─────────────────────────────────────────────────
+          // ── Hint text ────────────────────────────────────────────────────
           if (_camReady && !_isAnalyzing)
             Positioned(
-              bottom: botPad + 104,
+              bottom: botPad + 124,
               left: 0, right: 0,
               child: Center(
                 child: Text(
@@ -878,7 +1018,7 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             ),
 
-          // ── Bottom bar ─────────────────────────────────────────────────
+          // ── Bottom bar ───────────────────────────────────────────────────
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: Container(
@@ -890,10 +1030,7 @@ class _CameraScreenState extends State<CameraScreen>
                 ),
               ),
               padding: EdgeInsets.only(
-                  bottom: botPad + 20,
-                  top: 20,
-                  left: 28,
-                  right: 28),
+                  bottom: botPad + 20, top: 20, left: 28, right: 28),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -924,24 +1061,19 @@ class _CameraScreenState extends State<CameraScreen>
                                 _pulseCtrl.value)!
                                 : Colors.white24,
                             boxShadow: canShoot
-                                ? [
-                              BoxShadow(
-                                color: const Color(0xFFFFD600)
-                                    .withOpacity(
-                                    0.35 + 0.25 * _pulseCtrl.value),
-                                blurRadius: 24,
-                                spreadRadius: 4,
-                              )
-                            ]
+                                ? [BoxShadow(
+                              color: const Color(0xFFFFD600)
+                                  .withOpacity(0.35 + 0.25 * _pulseCtrl.value),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            )]
                                 : [],
                           ),
                           child: Icon(
                             _isCapturing
                                 ? Icons.hourglass_top_rounded
                                 : Icons.camera_alt_rounded,
-                            color: canShoot
-                                ? Colors.black87
-                                : Colors.white38,
+                            color: canShoot ? Colors.black87 : Colors.white38,
                             size: 30,
                           ),
                         );
@@ -957,6 +1089,7 @@ class _CameraScreenState extends State<CameraScreen>
                     active: _torchOn,
                     onTap: _camReady && !_isAnalyzing ? _toggleTorch : null,
                   ),
+
                 ],
               ),
             ),
@@ -967,7 +1100,6 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   Widget _buildErrorView() {
     return Center(
       child: Padding(
@@ -1017,7 +1149,7 @@ class _CameraScreenState extends State<CameraScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Corner bracket painter
+//  Corner bracket painter (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _CornerBracketPainter extends CustomPainter {
   final Color color;
@@ -1061,7 +1193,7 @@ class _CornerBracketPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Bottom action button
+//  Bottom action button (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BottomActionBtn extends StatelessWidget {
   final IconData icon;
@@ -1095,17 +1227,13 @@ class _BottomActionBtn extends StatelessWidget {
                 : null,
           ),
           child: Icon(icon,
-              color: active
-                  ? const Color(0xFFFFD600)
-                  : Colors.white70,
+              color: active ? const Color(0xFFFFD600) : Colors.white70,
               size: 22),
         ),
         const SizedBox(height: 5),
         Text(label,
             style: TextStyle(
-                color: active
-                    ? const Color(0xFFFFD600)
-                    : Colors.white54,
+                color: active ? const Color(0xFFFFD600) : Colors.white54,
                 fontSize: 10,
                 fontWeight: FontWeight.w500)),
       ]),

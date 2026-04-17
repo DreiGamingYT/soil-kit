@@ -7,7 +7,7 @@ class DashboardScreen extends StatelessWidget {
   final int p;
   final int k;
 
-  DashboardScreen(this.n,this.p,this.k);
+  const DashboardScreen(this.n,this.p,this.k, {super.key});
 
   @override
   Widget build(BuildContext context){
