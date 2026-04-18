@@ -2,43 +2,28 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class OrderService {
-  OrderService._();
-  static final OrderService instance = OrderService._();
+  final _db = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  // Called when user taps "Order" in the shop screen
+  Future<void> placeOrder(List<Map<String, dynamic>> items) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
 
-  Future<void> placeOrder({
-    required List<Map<String, dynamic>> items,
-    required int total,
-  }) async {
-    final user = _auth.currentUser;
-
-    if (user == null) {
-      throw Exception('You must be logged in to place an order.');
-    }
-
-    await _firestore.collection('orders').add({
-      'userId': user.uid,
-      'userName': user.displayName ?? '',
-      'userEmail': user.email ?? '',
+    await _db.collection('orders').add({
+      'uid': uid,
       'items': items,
-      'total': total,
       'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> myOrders() {
-    final user = _auth.currentUser;
-
-    if (user == null) {
-      throw Exception('User not logged in.');
-    }
-
-    return _firestore
+  // Stream used by My Orders screen (step 4 in diagram)
+  Stream<QuerySnapshot> listenToMyOrders() {
+    final uid = _auth.currentUser?.uid;
+    return _db
         .collection('orders')
-        .where('userId', isEqualTo: user.uid)
+        .where('uid', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }

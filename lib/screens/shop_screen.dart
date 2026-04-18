@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/order_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import '../services/order_service.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
 class _Reagent {
@@ -1111,40 +1112,13 @@ class _CartSheet extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    try {
-                      Fluttertoast.showToast(
-                        msg: 'Processing order...',
-                        gravity: ToastGravity.CENTER,
-                        toastLength: Toast.LENGTH_SHORT,
-                      );
-
-                      await OrderService.instance.placeOrder(
-                        items: cart
-                            .map((e) => {
-                          'name': e.label,
-                          'price': e.price,
-                          'qty': e.qty,
-                        })
-                            .toList(),
-                        total: total,
-                      );
-
-                      if (context.mounted) {
-                        Navigator.pop(context);
-
-                        Fluttertoast.showToast(
-                          msg: 'Order placed successfully',
-                          gravity: ToastGravity.CENTER,
-                        );
-                      }
-
-                      cart.clear();
-                    } catch (e) {
-                      Fluttertoast.showToast(
-                        msg: e.toString(),
-                        gravity: ToastGravity.CENTER,
-                      );
-                    }
+                    await OrderService().placeOrder(yourItemsList);
+                    Fluttertoast.showToast(
+                      msg: "Order placed!",
+                      gravity: ToastGravity.CENTER,
+                      backgroundColor: Colors.green,
+                      textColor: Colors.white,
+                    );
                   },
                   child: const Text('Place Order'),
                 ),

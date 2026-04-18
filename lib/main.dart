@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:firebase_core/firebase_core.dart';
-
-import 'screens/auth_gate.dart';
+import 'screens/login_screen.dart';
 import 'services/settings_service.dart';
 
 // If you used FlutterFire CLI, uncomment this:
@@ -73,7 +72,7 @@ class SoilApp extends StatelessWidget {
           themeMode: mode,
           theme: _light(),
           darkTheme: _dark(),
-          home: const AuthGate(),
+          home: const LoginScreen(),
         ),
       ),
     );

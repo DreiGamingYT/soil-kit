@@ -9,6 +9,10 @@ import 'main_scaffold.dart';
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
+  // Add this static method to AuthService
+  static Stream<User?> authStateChanges() =>
+      FirebaseAuth.instance.authStateChanges();
+
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
