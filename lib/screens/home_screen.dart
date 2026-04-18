@@ -10,6 +10,8 @@ import 'notes_screen.dart';
 import 'profile_screen.dart';
 import 'history_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatelessWidget {
   final int selectedIndex;
@@ -250,6 +252,10 @@ class _HomeBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final s   = SettingsService.instance;
     final cs  = Theme.of(context).colorScheme;
+    final firebaseUser = AuthService.instance.currentUser;
+    final displayName  = firebaseUser?.displayName
+        ?? firebaseUser?.email?.split('@').first
+        ?? 'Farmer';
     final top = MediaQuery.of(context).padding.top;
 
     return SafeArea(
@@ -294,7 +300,7 @@ class _HomeBody extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        s.tr('username'),
+                        displayName,
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,

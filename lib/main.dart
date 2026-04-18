@@ -18,7 +18,7 @@ Future<void> main() async {
     // options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await NotificationService.instance.init();
+  NotificationService.instance.init();
 
   runApp(const SoilApp());
 }

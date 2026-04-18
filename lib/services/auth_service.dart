@@ -49,7 +49,9 @@ class AuthService {
       idToken: googleAuth.idToken,
     );
     final result = await _auth.signInWithCredential(credential);
-    return result.user;
+    final user = result.user;
+    if (user != null) await _ensureFirestoreProfile(user);
+    return user;
   }
 
   // FACEBOOK
@@ -59,7 +61,9 @@ class AuthService {
     final credential =
     FacebookAuthProvider.credential(result.accessToken!.tokenString);
     final userCredential = await _auth.signInWithCredential(credential);
-    return userCredential.user;
+    final user = userCredential.user;
+    if (user != null) await _ensureFirestoreProfile(user);
+    return user;
   }
 
   Future<void> signOut() async {
@@ -69,4 +73,20 @@ class AuthService {
   }
 
   User? get currentUser => _auth.currentUser;
+
+  // Creates a Firestore profile only if one doesn't exist yet.
+  // Safe to call on every login — uses merge: false via set with merge.
+  Future<void> _ensureFirestoreProfile(User user) async {
+    final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        'uid':       user.uid,
+        'email':     user.email ?? '',
+        'name':      user.displayName ?? user.email?.split('@').first ?? 'SoilMate User',
+        'location':  '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
 }
