@@ -1187,47 +1187,45 @@ class _CartSheetState extends State<_CartSheet> {
                             );
                             return;
                           }
+
                           setState(() => _placing = true);
+                          final messenger = ScaffoldMessenger.of(context);
+                          final nav = Navigator.of(context);
+
                           try {
-                            final items = widget.cart
-                                .map((c) => {
-                              'name': c.label,
-                              'qty': c.qty,
-                              'price': c.price
+                            final items = widget.cart.map((c) => {
+                              'name': c.label, 'qty': c.qty, 'price': c.price
                             }).toList();
+
                             await OrderService.instance.placeOrder(
-                              items,
-                              widget.total,
+                              items, widget.total,
                               contact: _contactCtrl.text.trim(),
                               address: _addressCtrl.text.trim(),
+                            ).timeout(const Duration(seconds: 15));
+
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: const Row(children: [
+                                  Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Order placed successfully!'),
+                                ]),
+                                backgroundColor: SoilColors.primary,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(Sr.rSm)),
+                              ),
                             );
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              widget.onOrderPlaced();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(children: [
-                                    Icon(Icons.check_circle_outline,
-                                        color: Colors.white, size: 16),
-                                    SizedBox(width: 8),
-                                    Text('Order placed successfully!'),
-                                  ]),
-                                  backgroundColor: SoilColors.primary,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(Sr.rSm)),
-                                ),
-                              );
-                            }
+                            nav.pop();
+                            widget.onOrderPlaced();
+
                           } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Order failed: $e'),
-                                    backgroundColor: Colors.red),
-                              );
-                            }
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('Order failed: $e'), backgroundColor: Colors.red),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _placing = false);
                           }
-                          if (mounted) setState(() => _placing = false);
                         },
                         child: _placing
                             ? const SizedBox(width: 18, height: 18,
