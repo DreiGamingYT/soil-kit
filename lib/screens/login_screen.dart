@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
-import 'main_scaffold.dart';
 import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,13 +23,10 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _goHome() {
-    // Save FCM token now that we know the user's UID
+  void _saveToken() {
+    // Save FCM token now that we know the user's UID.
+    // Navigation is handled by AuthGate's StreamBuilder automatically.
     NotificationService.instance.saveTokenForCurrentUser();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainScaffold()),
-    );
   }
 
   Future<void> _emailSubmit() async {
@@ -41,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _emailCtrl.text.trim(), _passCtrl.text.trim())
           : await _auth.signInWithEmail(
           _emailCtrl.text.trim(), _passCtrl.text.trim());
-      if (user != null && mounted) _goHome();
+      if (user != null && mounted) _saveToken();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -55,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithGoogle();
-      if (user != null && mounted) _goHome();
+      if (user != null && mounted) _saveToken();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -69,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithFacebook();
-      if (user != null && mounted) _goHome();
+      if (user != null && mounted) _saveToken();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -168,11 +164,11 @@ class _LoginScreenState extends State<LoginScreen> {
               // Google button
               OutlinedButton.icon(
                 onPressed: _loading ? null : _googleLogin,
-                icon: const Text('G',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: Colors.red)),
+                icon: Image.asset(
+                  'assets/google_logo.png',
+                  width: 20,
+                  height: 20,
+                ),
                 label: const Text('Continue with Google'),
               ),
               const SizedBox(height: 10),
@@ -180,7 +176,11 @@ class _LoginScreenState extends State<LoginScreen> {
               // Facebook button
               OutlinedButton.icon(
                 onPressed: _loading ? null : _facebookLogin,
-                icon: const Icon(Icons.facebook, color: Color(0xFF1877F2)),
+                icon: const Icon(
+                  Icons.facebook,
+                  color: Color(0xFF1877F2),
+                  size: 23,
+                ),
                 label: const Text('Continue with Facebook'),
               ),
             ],

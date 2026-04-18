@@ -19,4 +19,13 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <string name="app_name">SoilMate</string>
+
+    <!-- ── Facebook Login Credentials ──────────────────────────────── -->
+    <!-- Replace these values with your actual Facebook App credentials  -->
+    <!-- Get them from: https://developers.facebook.com/apps/            -->
+    <string name="facebook_app_id">1281565280062425</string>
+    <string name="facebook_client_token">bf2685dddd58ab30e58ae454cd5556f8</string>
+    <!-- ────────────────────────────────────────────────────────────── -->
 </resources>

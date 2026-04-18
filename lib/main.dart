@@ -7,7 +7,7 @@ import 'services/settings_service.dart';
 import 'services/notification_service.dart';
 
 // If you used FlutterFire CLI, uncomment this:
-// import 'firebase_options.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsBinding binding = WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +15,7 @@ Future<void> main() async {
 
   await Firebase.initializeApp(
     // If you used FlutterFire CLI, use this instead:
-    // options: DefaultFirebaseOptions.currentPlatform,
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   NotificationService.instance.init();
