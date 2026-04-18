@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/soil_data_service.dart';
 import '../services/auth_service.dart';
 import '../main.dart';
 import '../widgets/bottom_nav.dart';
 import 'faq_screen.dart' hide HelpGuideScreen;
 import 'help_guide_screen.dart' hide AppBottomNav;
-import 'settings_screen.dart';
 import 'login_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,17 +19,67 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _svc = SoilDataService.instance;
+  final _db  = FirebaseFirestore.instance;
 
-  late String _name;
-  late String _email;
-  String _location = 'Lunita Park';
+  String _name     = '';
+  String _email    = '';
+  String _location = '';
+  bool   _loading  = true;
 
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  /// Load profile from Firestore, fall back to Firebase Auth data.
+  Future<void> _loadProfile() async {
     final user = AuthService.instance.currentUser;
-    _name  = user?.displayName ?? user?.email?.split('@').first ?? 'SoilMate User';
-    _email = user?.email ?? 'No email';
+    if (user == null) return;
+
+    try {
+      final doc = await _db.collection('users').doc(user.uid).get();
+      final data = doc.data();
+      setState(() {
+        _name     = data?['name']     ?? user.displayName ?? user.email?.split('@').first ?? 'SoilMate User';
+        _email    = data?['email']    ?? user.email ?? '';
+        _location = data?['location'] ?? '';
+        _loading  = false;
+      });
+    } catch (_) {
+      // Fallback to auth data if Firestore fails
+      setState(() {
+        _name     = user.displayName ?? user.email?.split('@').first ?? 'SoilMate User';
+        _email    = user.email ?? '';
+        _location = '';
+        _loading  = false;
+      });
+    }
+  }
+
+  /// Save profile to Firestore and update Firebase Auth display name.
+  Future<void> _saveProfile(String name, String email, String location) async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
+    // Update Firebase Auth display name
+    if (name.isNotEmpty && name != user.displayName) {
+      await user.updateDisplayName(name);
+    }
+
+    // Save to Firestore
+    await _db.collection('users').doc(user.uid).set({
+      'name':      name,
+      'email':     email,
+      'location':  location,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    setState(() {
+      _name     = name;
+      _email    = email;
+      _location = location;
+    });
   }
 
   void _edit() {
@@ -37,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final lc = TextEditingController(text: _location);
     final cs = Theme.of(context).colorScheme;
     final messenger = ScaffoldMessenger.of(context);
+    bool saving = false;
 
     showModalBottomSheet(
       context: context,
@@ -45,90 +97,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 16,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: cs.outline.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Text(
-              'Edit Profile',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 22),
-            TextField(
-              controller: nc,
-              decoration: const InputDecoration(
-                hintText: 'Full name',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ec,
-              decoration: const InputDecoration(
-                hintText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lc,
-              decoration: const InputDecoration(
-                hintText: 'Location',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (_, setS) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 16,
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 32,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: cs.outline.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        if (nc.text.trim().isNotEmpty) _name = nc.text.trim();
-                        if (ec.text.trim().isNotEmpty) _email = ec.text.trim();
-                        if (lc.text.trim().isNotEmpty) _location = lc.text.trim();
-                      });
-                      Navigator.pop(context);
-                      messenger.showSnackBar(const SnackBar(
-                        content: Text('Profile updated'),
-                        backgroundColor: SoilColors.primary,
-                      ));
-                    },
-                    child: const Text('Save'),
-                  ),
+              ),
+              Text(
+                'Edit Profile',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: cs.onSurface,
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 22),
+              TextField(
+                controller: nc,
+                decoration: const InputDecoration(
+                  hintText: 'Full name',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ec,
+                decoration: const InputDecoration(
+                  hintText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lc,
+                decoration: const InputDecoration(
+                  hintText: 'Location',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: saving ? null : () async {
+                        setS(() => saving = true);
+                        try {
+                          await _saveProfile(
+                            nc.text.trim().isEmpty ? _name : nc.text.trim(),
+                            ec.text.trim().isEmpty ? _email : ec.text.trim(),
+                            lc.text.trim().isEmpty ? _location : lc.text.trim(),
+                          );
+                          if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                          messenger.showSnackBar(SnackBar(
+                            content: const Row(children: [
+                              Icon(Icons.check_circle_outline,
+                                  color: Colors.white, size: 16),
+                              SizedBox(width: 8),
+                              Text('Profile saved'),
+                            ]),
+                            backgroundColor: SoilColors.primary,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(Sr.rSm)),
+                          ));
+                        } catch (e) {
+                          setS(() => saving = false);
+                          messenger.showSnackBar(SnackBar(
+                            content: Text('Failed to save: $e'),
+                            backgroundColor: Colors.red,
+                          ));
+                        }
+                      },
+                      child: saving
+                          ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                          : const Text('Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -288,6 +363,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: cs.surface,

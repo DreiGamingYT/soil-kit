@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'notification_service.dart';
 
 class AuthService {
   AuthService._();
@@ -73,6 +74,8 @@ class AuthService {
     await _auth.signOut();
     await GoogleSignIn().signOut();
     await FacebookAuth.instance.logOut();
+    // Stop listening for order status changes
+    NotificationService.instance.stopOrderStatusListener();
   }
 
   User? get currentUser => _auth.currentUser;

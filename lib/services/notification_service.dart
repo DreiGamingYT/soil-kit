@@ -1,14 +1,13 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
-// Must be top-level (outside any class) — required by Firebase
+// Must be top-level — required by Firebase Messaging
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background messages are handled automatically by the OS tray.
-  // No extra work needed here unless you want to log them.
   debugPrint('FCM background: ${message.notification?.title}');
 }
 
@@ -19,41 +18,45 @@ class NotificationService {
   final _fcm = FirebaseMessaging.instance;
   final _db  = FirebaseFirestore.instance;
 
-  /// Call once in main() after Firebase.initializeApp()
+  // Holds the active order-status listener so we can cancel it on sign-out
+  StreamSubscription<QuerySnapshot>? _orderStatusSub;
+
+  // Tracks last-known statuses to detect changes (not just first-load)
+  final Map<String, String> _knownStatuses = {};
+
+  // ── Init (call once in main after Firebase.initializeApp) ────────────────
   Future<void> init() async {
-    // 1. Register the background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // 2. Request permission (iOS + Android 13+)
-    await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await _fcm.requestPermission(alert: true, badge: true, sound: true);
 
-    // 3. Handle messages while app is in the FOREGROUND
+    // Foreground: show a nice in-app banner
     FirebaseMessaging.onMessage.listen((message) {
       final title = message.notification?.title ?? 'SoilMate';
       final body  = message.notification?.body  ?? '';
-      _showToast('$title — $body');
+      _showBanner('$title — $body');
     });
 
-    // 4. Handle notification tap when app was in BACKGROUND (not terminated)
+    // Tapped while app was in background → navigate to orders
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       debugPrint('Notification tapped (background): ${message.data}');
-      // You can navigate to MyOrdersScreen here if needed
+      _navigatorKey?.currentState?.pushNamed('/orders');
     });
 
-    // 5. Check if app was launched from a terminated state via notification
+    // Launched from terminated state via notification
     final initial = await _fcm.getInitialMessage();
     if (initial != null) {
       debugPrint('App launched from notification: ${initial.data}');
     }
   }
 
-  /// Call this right after the user logs in successfully.
-  /// Saves the device FCM token to Firestore so the Admin app can
-  /// look it up and send targeted push notifications.
+  // ── Navigator key (optional: wire this in MaterialApp for deep-linking) ──
+  GlobalKey<NavigatorState>? _navigatorKey;
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
+
+  // ── Called right after login ──────────────────────────────────────────────
   Future<void> saveTokenForCurrentUser() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -66,16 +69,72 @@ class NotificationService {
       SetOptions(merge: true),
     );
 
-    // Refresh token automatically when it rotates
+    // Auto-refresh token when it rotates
     _fcm.onTokenRefresh.listen((newToken) async {
       await _db.collection('users').doc(uid).set(
         {'fcmToken': newToken, 'updatedAt': FieldValue.serverTimestamp()},
         SetOptions(merge: true),
       );
     });
+
+    // Start listening for order status changes
+    _startOrderStatusListener(uid);
   }
 
-  void _showToast(String msg) {
+  // ── Firestore listener: in-app alert when order status changes ────────────
+  void _startOrderStatusListener(String uid) {
+    _orderStatusSub?.cancel();
+    _knownStatuses.clear();
+
+    _orderStatusSub = _db
+        .collection('orders')
+        .where('uid', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .listen((snapshot) {
+      for (final change in snapshot.docChanges) {
+        final data   = change.doc.data();
+        if (data == null) continue;
+        final id     = change.doc.id;
+        final status = data['status'] as String? ?? 'pending';
+
+        if (change.type == DocumentChangeType.added) {
+          // First time we see this order — just record its status
+          _knownStatuses[id] = status;
+        } else if (change.type == DocumentChangeType.modified) {
+          final prev = _knownStatuses[id];
+          if (prev != null && prev != status) {
+            // Status actually changed → show notification
+            _knownStatuses[id] = status;
+            final shortId = id.substring(0, 6).toUpperCase();
+            _showBanner('Order #$shortId is now ${_statusLabel(status)}');
+          } else {
+            _knownStatuses[id] = status;
+          }
+        }
+      }
+    });
+  }
+
+  /// Call this on sign-out to stop the listener
+  void stopOrderStatusListener() {
+    _orderStatusSub?.cancel();
+    _orderStatusSub = null;
+    _knownStatuses.clear();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'approved':   return 'Approved ✅';
+      case 'packed':     return 'Packed 📦';
+      case 'to_receive': return 'Out for Delivery 🚚';
+      default:           return status;
+    }
+  }
+
+  void _showBanner(String msg) {
     Fluttertoast.showToast(
       msg: msg,
       gravity: ToastGravity.TOP,
