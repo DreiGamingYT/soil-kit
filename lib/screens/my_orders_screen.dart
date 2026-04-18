@@ -20,7 +20,7 @@ class MyOrdersScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('My Orders')),
       body: StreamBuilder<QuerySnapshot>(
-        stream: OrderService().listenToMyOrders(),
+        stream: OrderService.instance.myOrders(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

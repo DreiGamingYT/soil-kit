@@ -9,10 +9,6 @@ import 'main_scaffold.dart';
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
-  // Add this static method to AuthService
-  static Stream<User?> authStateChanges() =>
-      FirebaseAuth.instance.authStateChanges();
-
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
@@ -36,11 +32,7 @@ class _AuthGateState extends State<AuthGate> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
-        if (snapshot.data == null) {
-          return const LoginScreen();
-        }
-
+        if (snapshot.data == null) return const LoginScreen();
         return const MainScaffold();
       },
     );

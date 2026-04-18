@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/login_screen.dart';
+import 'screens/auth_gate.dart';
 import 'services/settings_service.dart';
+import 'services/notification_service.dart';
 
 // If you used FlutterFire CLI, uncomment this:
 // import 'firebase_options.dart';
@@ -16,6 +17,8 @@ Future<void> main() async {
     // If you used FlutterFire CLI, use this instead:
     // options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await NotificationService.instance.init();
 
   runApp(const SoilApp());
 }
@@ -72,7 +75,7 @@ class SoilApp extends StatelessWidget {
           themeMode: mode,
           theme: _light(),
           darkTheme: _dark(),
-          home: const LoginScreen(),
+          home: const AuthGate(),
         ),
       ),
     );

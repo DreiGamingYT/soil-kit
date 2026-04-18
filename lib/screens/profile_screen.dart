@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/soil_data_service.dart';
+import '../services/auth_service.dart';
 import '../main.dart';
 import '../widgets/bottom_nav.dart';
 import 'faq_screen.dart' hide HelpGuideScreen;
 import 'help_guide_screen.dart' hide AppBottomNav;
 import 'settings_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,9 +19,17 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _svc = SoilDataService.instance;
 
-  String _name = 'SoilMate';
-  String _email = 'soilmate@email.com';
+  late String _name;
+  late String _email;
   String _location = 'Lunita Park';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService.instance.currentUser;
+    _name  = user?.displayName ?? user?.email?.split('@').first ?? 'SoilMate User';
+    _email = user?.email ?? 'No email';
+  }
 
   void _edit() {
     final nc = TextEditingController(text: _name);
@@ -483,6 +494,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () => _showAbout(context),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.logout_rounded, size: 18, color: Colors.red),
+                  label: const Text(
+                    'Sign Out',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: Colors.red, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Sr.rMd),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(Sr.rLg),
+                        ),
+                        title: const Text('Sign out?',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        content: const Text(
+                            'You will be returned to the login screen.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Sign Out'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirmed == true && mounted) {
+                      await AuthService.instance.signOut();
+                      if (mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              (route) => false,
+                        );
+                      }
+                    }
+                  },
+                ),
               ),
             ],
           ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../main.dart';
 import '../services/auth_service.dart';
+import 'main_scaffold.dart';
+import '../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -9,55 +11,180 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _auth = AuthService();
+  final _auth = AuthService.instance;
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
+  bool _isRegister = false; // toggles between Login and Register
 
-  void _goHome() {
-    // Replace with your actual home screen
-    Navigator.pushReplacementNamed(context, '/home');
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
-  Future<void> _emailLogin() async {
+  void _goHome() {
+    // Save FCM token now that we know the user's UID
+    NotificationService.instance.saveTokenForCurrentUser();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainScaffold()),
+    );
+  }
+
+  Future<void> _emailSubmit() async {
     setState(() => _loading = true);
     try {
-      final user = await _auth.signInWithEmail(
+      final user = _isRegister
+          ? await _auth.registerWithEmail(
+          _emailCtrl.text.trim(), _passCtrl.text.trim())
+          : await _auth.signInWithEmail(
           _emailCtrl.text.trim(), _passCtrl.text.trim());
-      if (user != null) _goHome();
+      if (user != null && mounted) _goHome();
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _googleLogin() async {
     setState(() => _loading = true);
-    final user = await _auth.signInWithGoogle();
-    if (user != null) _goHome();
-    setState(() => _loading = false);
+    try {
+      final user = await _auth.signInWithGoogle();
+      if (user != null && mounted) _goHome();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _facebookLogin() async {
+    setState(() => _loading = true);
+    try {
+      final user = await _auth.signInWithFacebook();
+      if (user != null && mounted) _goHome();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('SoilMate', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 32),
-            TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
-            TextField(controller: _passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
-            const SizedBox(height: 16),
-            if (_loading) const CircularProgressIndicator()
-            else ...[
-              ElevatedButton(onPressed: _emailLogin, child: const Text('Login with Email')),
-              OutlinedButton(onPressed: _googleLogin, child: const Text('Login with Google')),
-            ]
-          ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 32),
+              // Logo / title
+              const Text(
+                '🌱 SoilMate',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _isRegister ? 'Create an account' : 'Welcome back',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14, color: cs.onSurface.withOpacity(0.5)),
+              ),
+              const SizedBox(height: 36),
+
+              // Email field
+              TextField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Password field
+              TextField(
+                controller: _passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Email submit button
+              if (_loading)
+                const Center(child: CircularProgressIndicator())
+              else
+                ElevatedButton(
+                  onPressed: _emailSubmit,
+                  child: Text(_isRegister ? 'Create Account' : 'Login'),
+                ),
+
+              const SizedBox(height: 12),
+
+              // Toggle register/login
+              TextButton(
+                onPressed: () =>
+                    setState(() => _isRegister = !_isRegister),
+                child: Text(
+                  _isRegister
+                      ? 'Already have an account? Login'
+                      : "Don't have an account? Register",
+                  style: TextStyle(color: SoilColors.primary),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: Divider(color: cs.outline)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('or',
+                      style: TextStyle(
+                          color: cs.onSurface.withOpacity(0.4),
+                          fontSize: 12)),
+                ),
+                Expanded(child: Divider(color: cs.outline)),
+              ]),
+              const SizedBox(height: 16),
+
+              // Google button
+              OutlinedButton.icon(
+                onPressed: _loading ? null : _googleLogin,
+                icon: const Text('G',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Colors.red)),
+                label: const Text('Continue with Google'),
+              ),
+              const SizedBox(height: 10),
+
+              // Facebook button
+              OutlinedButton.icon(
+                onPressed: _loading ? null : _facebookLogin,
+                icon: const Icon(Icons.facebook, color: Color(0xFF1877F2)),
+                label: const Text('Continue with Facebook'),
+              ),
+            ],
+          ),
         ),
       ),
     );

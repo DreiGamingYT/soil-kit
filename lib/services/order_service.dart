@@ -2,24 +2,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class OrderService {
+  OrderService._();
+  static final instance = OrderService._();
+
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  // Called when user taps "Order" in the shop screen
-  Future<void> placeOrder(List<Map<String, dynamic>> items) async {
+  Future<void> placeOrder(List<Map<String, dynamic>> items, int total) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     await _db.collection('orders').add({
       'uid': uid,
       'items': items,
+      'total': total,
       'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  // Stream used by My Orders screen (step 4 in diagram)
-  Stream<QuerySnapshot> listenToMyOrders() {
+  // Used by shop_screen.dart
+  Stream<QuerySnapshot<Map<String, dynamic>>> myOrders() {
     final uid = _auth.currentUser?.uid;
     return _db
         .collection('orders')

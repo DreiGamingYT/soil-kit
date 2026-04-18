@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/order_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import '../services/order_service.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
 class _Reagent {
@@ -1112,13 +1111,33 @@ class _CartSheet extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    await OrderService().placeOrder(yourItemsList);
+                    Navigator.pop(context); // close cart sheet
                     Fluttertoast.showToast(
-                      msg: "Order placed!",
+                      msg: "Processing order...",
                       gravity: ToastGravity.CENTER,
-                      backgroundColor: Colors.green,
+                      backgroundColor: Colors.orange,
                       textColor: Colors.white,
+                      toastLength: Toast.LENGTH_LONG,
                     );
+                    try {
+                      final items = cart
+                          .map((c) => {'name': c.label, 'qty': c.qty, 'price': c.price})
+                          .toList();
+                      await OrderService.instance.placeOrder(items, total);
+                      Fluttertoast.showToast(
+                        msg: "Order placed successfully!",
+                        gravity: ToastGravity.CENTER,
+                        backgroundColor: Colors.green,
+                        textColor: Colors.white,
+                      );
+                    } catch (e) {
+                      Fluttertoast.showToast(
+                        msg: "Order failed: ${e.toString()}",
+                        gravity: ToastGravity.CENTER,
+                        backgroundColor: Colors.red,
+                        textColor: Colors.white,
+                      );
+                    }
                   },
                   child: const Text('Place Order'),
                 ),
