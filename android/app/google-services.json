@@ -12,7 +12,20 @@
           "package_name": "com.example.soil_kit"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "926323354090-ao5vs7q1gm85smvbqc5pjg8ngi64pirn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.soil_kit",
+            "certificate_hash": "8737e4c5f8549ead43677d6dfc91c3aab8fa0232"
+          }
+        },
+        {
+          "client_id": "926323354090-b2fqpglcufo2d384jk4g60dsj01g6ptn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCPORi79W9spENGA3mKw1O0D79E6YWEJS4"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "926323354090-b2fqpglcufo2d384jk4g60dsj01g6ptn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "926323354090-gb8bnqdroepjd9muhmqqa0ojo58qr6ls.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.soilKit"
+              }
+            }
+          ]
         }
       }
     }

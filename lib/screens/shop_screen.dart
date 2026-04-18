@@ -100,6 +100,7 @@ class _ShopScreenState extends State<ShopScreen> {
               }
             });
           }),
+          onOrderPlaced: () => setState(() => _cart.clear()),
         ),
       ),
     );
@@ -975,107 +976,99 @@ class _CartBar extends StatelessWidget {
 }
 
 // ── Cart Sheet ────────────────────────────────────────────────────────────────
-class _CartSheet extends StatelessWidget {
+class _CartSheet extends StatefulWidget {
   final List<_CartItem> cart;
   final int total;
   final void Function(_CartItem) onRemove;
+  final VoidCallback onOrderPlaced;
 
   const _CartSheet({
     required this.cart,
     required this.total,
     required this.onRemove,
+    required this.onOrderPlaced,
   });
 
   @override
+  State<_CartSheet> createState() => _CartSheetState();
+}
+
+class _CartSheetState extends State<_CartSheet> {
+  bool _showCheckout = false;
+  final _contactCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  bool _placing = false;
+
+  @override
+  void dispose() {
+    _contactCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs     = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bot = MediaQuery.of(context).padding.bottom;
+    final bot    = MediaQuery.of(context).padding.bottom;
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? SoilColors.surfaceDark : SoilColors.surfaceLight,
-        borderRadius:
-        const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
       ),
-      padding: EdgeInsets.only(bottom: bot + 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outline,
-                borderRadius: BorderRadius.circular(Sr.rPill),
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: EdgeInsets.only(
+        bottom: bot + 20,
+        left: 0, right: 0,
+      ),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(child: Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 38, height: 4,
+            decoration: BoxDecoration(
+                color: cs.outline, borderRadius: BorderRadius.circular(Sr.rPill)),
+          )),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Your Cart',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
-                ),
+                _showCheckout ? 'Checkout' : 'Your Cart',
+                style: const TextStyle(fontSize: 18,
+                    fontWeight: FontWeight.w800, letterSpacing: -0.4),
               ),
             ),
           ),
-          if (cart.isEmpty)
+
+          if (widget.cart.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
-              child: Text(
-                'Cart is empty',
-                style: TextStyle(
-                  color: cs.onSurface.withOpacity(0.35),
-                  fontSize: 14,
-                ),
-              ),
+              child: Text('Cart is empty',
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.35),
+                      fontSize: 14)),
             )
-          else ...[
-            ...cart.map((item) => ListTile(
-              title: Text(
-                item.label,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
+          else if (!_showCheckout) ...[
+            // ── Cart items ────────────────────────────────────────────────
+            ...widget.cart.map((item) => ListTile(
+              title: Text(item.label,
+                  style: const TextStyle(fontSize: 13.5,
+                      fontWeight: FontWeight.w600)),
+              subtitle: Text('₱${item.price} × ${item.qty}',
+                  style: TextStyle(fontSize: 12,
+                      color: cs.onSurface.withOpacity(0.45))),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('₱${item.price * item.qty}',
+                    style: const TextStyle(fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: SoilColors.primary)),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => widget.onRemove(item),
+                  child: Icon(Icons.remove_circle_outline_rounded,
+                      size: 20, color: cs.onSurface.withOpacity(0.35)),
                 ),
-              ),
-              subtitle: Text(
-                '₱${item.price} × ${item.qty}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.45),
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '₱${item.price * item.qty}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: SoilColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => onRemove(item),
-                    child: Icon(
-                      Icons.remove_circle_outline_rounded,
-                      size: 20,
-                      color: cs.onSurface.withOpacity(0.35),
-                    ),
-                  ),
-                ],
-              ),
+              ]),
               contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
             )),
@@ -1085,23 +1078,13 @@ class _CartSheet extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 15,
+                  Text('Total', style: TextStyle(fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: cs.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                  Text(
-                    '₱$total',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: SoilColors.primary,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
+                      color: cs.onSurface.withOpacity(0.6))),
+                  Text('₱${widget.total}',
+                      style: const TextStyle(fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: SoilColors.primary, letterSpacing: -0.5)),
                 ],
               ),
             ),
@@ -1110,41 +1093,156 @@ class _CartSheet extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context); // close cart sheet
-                    Fluttertoast.showToast(
-                      msg: "Processing order...",
-                      gravity: ToastGravity.CENTER,
-                      backgroundColor: Colors.orange,
-                      textColor: Colors.white,
-                      toastLength: Toast.LENGTH_LONG,
-                    );
-                    try {
-                      final items = cart
-                          .map((c) => {'name': c.label, 'qty': c.qty, 'price': c.price})
-                          .toList();
-                      await OrderService.instance.placeOrder(items, total);
-                      Fluttertoast.showToast(
-                        msg: "Order placed successfully!",
-                        gravity: ToastGravity.CENTER,
-                        backgroundColor: Colors.green,
-                        textColor: Colors.white,
-                      );
-                    } catch (e) {
-                      Fluttertoast.showToast(
-                        msg: "Order failed: ${e.toString()}",
-                        gravity: ToastGravity.CENTER,
-                        backgroundColor: Colors.red,
-                        textColor: Colors.white,
-                      );
-                    }
-                  },
-                  child: const Text('Place Order'),
+                  onPressed: () => setState(() => _showCheckout = true),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.arrow_forward_rounded, size: 16),
+                      SizedBox(width: 6),
+                      Text('Proceed to Checkout'),
+                    ],
+                  ),
                 ),
               ),
             ),
+          ] else ...[
+            // ── Checkout form ─────────────────────────────────────────────
+            Padding(
+              padding: EdgeInsets.only(
+                left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order summary chip
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: SoilColors.primaryLight.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(Sr.rMd),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.receipt_long_outlined,
+                          size: 16, color: SoilColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${widget.cart.fold(0, (a, b) => a + b.qty)} item(s)  •  Total: ₱${widget.total}',
+                        style: const TextStyle(fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: SoilColors.primary),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Contact Number',
+                      style: TextStyle(fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withOpacity(0.55))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _contactCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. 09171234567',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Delivery Address',
+                      style: TextStyle(fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withOpacity(0.55))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _addressCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: 'Street, Barangay, City',
+                      prefixIcon: Padding(
+                        padding: EdgeInsets.only(bottom: 22),
+                        child: Icon(Icons.location_on_outlined),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _showCheckout = false),
+                        child: const Text('Back'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _placing ? null : () async {
+                          if (_contactCtrl.text.trim().isEmpty ||
+                              _addressCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please fill in contact and address'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          setState(() => _placing = true);
+                          try {
+                            final items = widget.cart
+                                .map((c) => {
+                              'name': c.label,
+                              'qty': c.qty,
+                              'price': c.price
+                            }).toList();
+                            await OrderService.instance.placeOrder(
+                              items,
+                              widget.total,
+                              contact: _contactCtrl.text.trim(),
+                              address: _addressCtrl.text.trim(),
+                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              widget.onOrderPlaced();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Row(children: [
+                                    Icon(Icons.check_circle_outline,
+                                        color: Colors.white, size: 16),
+                                    SizedBox(width: 8),
+                                    Text('Order placed successfully!'),
+                                  ]),
+                                  backgroundColor: SoilColors.primary,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(Sr.rSm)),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Order failed: $e'),
+                                    backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                          if (mounted) setState(() => _placing = false);
+                        },
+                        child: _placing
+                            ? const SizedBox(width: 18, height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                            : const Text('Place Order'),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ],
-        ],
+        ]),
       ),
     );
   }

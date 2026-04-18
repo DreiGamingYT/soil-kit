@@ -8,15 +8,22 @@ class OrderService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  Future<void> placeOrder(List<Map<String, dynamic>> items, int total) async {
+  Future<void> placeOrder(
+      List<Map<String, dynamic>> items,
+      int total, {
+        String contact = '',
+        String address = '',
+      }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     await _db.collection('orders').add({
-      'uid': uid,
-      'items': items,
-      'total': total,
-      'status': 'pending',
+      'uid':       uid,
+      'items':     items,
+      'total':     total,
+      'status':    'pending',
+      'contact':   contact,
+      'address':   address,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

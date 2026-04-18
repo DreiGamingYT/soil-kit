@@ -56,7 +56,10 @@ class AuthService {
 
   // FACEBOOK
   Future<User?> signInWithFacebook() async {
-    final result = await FacebookAuth.instance.login();
+    final result = await FacebookAuth.instance.login(
+      permissions: ['public_profile', 'email'],
+      loginTracking: LoginTracking.limited, // use limited if email still fails
+    );
     if (result.status != LoginStatus.success) return null;
     final credential =
     FacebookAuthProvider.credential(result.accessToken!.tokenString);
