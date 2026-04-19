@@ -56,6 +56,18 @@ class _ShopScreenState extends State<ShopScreen> {
     _showAddedSnack(label);
   }
 
+  void _removeCartItem(String key) {
+    setState(() {
+      final existing = _cart.where((c) => c.key == key).toList();
+      if (existing.isEmpty) return;
+      if (existing.first.qty > 1) {
+        existing.first.qty--;
+      } else {
+        _cart.remove(existing.first);
+      }
+    });
+  }
+
   void _showAddedSnack(String label) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -68,6 +80,85 @@ class _ShopScreenState extends State<ShopScreen> {
         duration: const Duration(milliseconds: 1400),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sr.rSm)),
         backgroundColor: SoilColors.primary,
+      ),
+    );
+  }
+
+  void _showProductDetail({
+    required String key,
+    required String name,
+    required String subtitle,
+    required String imagePath,
+    required String emoji,
+    required int price,
+    required Color accentColor,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final qty = _cart.where((c) => c.key == key).fold(0, (a, b) => a + b.qty);
+          final cs  = Theme.of(ctx).colorScheme;
+          return Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
+            ),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).padding.bottom + 24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Center(child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 38, height: 4,
+                decoration: BoxDecoration(
+                    color: cs.outline, borderRadius: BorderRadius.circular(Sr.rPill)),
+              )),
+              Container(
+                height: 220, width: double.infinity,
+                color: accentColor.withOpacity(0.1),
+                child: Image.asset(imagePath, fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        Center(child: Text(emoji, style: const TextStyle(fontSize: 72)))),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name, style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w800,
+                      color: cs.onSurface, letterSpacing: -0.4)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: TextStyle(
+                      fontSize: 13, color: cs.onSurface.withOpacity(0.5), height: 1.4)),
+                  const SizedBox(height: 16),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text('₱$price', style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.w800,
+                        color: accentColor, letterSpacing: -0.5)),
+                    Row(children: [
+                      _QtyButton(
+                        icon: Icons.remove_rounded,
+                        color: accentColor,
+                        onTap: qty > 0 ? () { _removeCartItem(key); setS(() {}); } : null,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Text('$qty', style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800)),
+                      ),
+                      _QtyButton(
+                        icon: Icons.add_rounded,
+                        color: accentColor,
+                        filled: true,
+                        onTap: () { _addCartItem(key, name, price); setS(() {}); },
+                      ),
+                    ]),
+                  ]),
+                ]),
+              ),
+            ]),
+          );
+        },
       ),
     );
   }
@@ -344,9 +435,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                     borderRadius: BorderRadius.circular(Sr.rPill),
                                   ),
                                   child: Text(
-                                    status
-                                        .toUpperCase()
-                                        .replaceAll('_', ' '),
+                                    status.toUpperCase().replaceAll('_', ' '),
                                     style: TextStyle(
                                       color: statusColor,
                                       fontWeight: FontWeight.w700,
@@ -421,6 +510,16 @@ class _ShopScreenState extends State<ShopScreen> {
                   accentColor: SoilColors.primary,
                   cartQty: _cart.where((c) => c.key == 'test_kit').fold(0, (a, b) => a + b.qty),
                   onAdd: () => _addCartItem('test_kit', '1 Set Test Kit', 349),
+                  onRemove: () => _removeCartItem('test_kit'),
+                  onTap: () => _showProductDetail(
+                    key: 'test_kit',
+                    name: '1 Set Test Kit',
+                    subtitle: 'Complete kit with all reagents & tools',
+                    imagePath: 'assets/images/test_kit.png',
+                    emoji: '🧺',
+                    price: 349,
+                    accentColor: SoilColors.primary,
+                  ),
                 ),
                 // ── Test Tube ─────────────────────────────────────
                 _ShopItemCard(
@@ -432,6 +531,16 @@ class _ShopScreenState extends State<ShopScreen> {
                   accentColor: const Color(0xFF546E7A),
                   cartQty: _cart.where((c) => c.key == 'tube_dropper').fold(0, (a, b) => a + b.qty),
                   onAdd: () => _addCartItem('tube_dropper', 'Test Tubes & Droplets', 29),
+                  onRemove: () => _removeCartItem('tube_dropper'),
+                  onTap: () => _showProductDetail(
+                    key: 'tube_dropper',
+                    name: 'Test Tubes & Droplets',
+                    subtitle: 'Borosilicate glass + precision dropper',
+                    imagePath: 'assets/images/test_tube.png',
+                    emoji: '🔬',
+                    price: 29,
+                    accentColor: const Color(0xFF546E7A),
+                  ),
                 ),
               ],
             ),
@@ -472,6 +581,16 @@ class _ShopScreenState extends State<ShopScreen> {
                   accentColor: r.color,
                   cartQty: qty,
                   onAdd: () => _addCartItem(r.key, '${r.name} Reagent', 99),
+                  onRemove: () => _removeCartItem(r.key),
+                  onTap: () => _showProductDetail(
+                    key: r.key,
+                    name: r.name,
+                    subtitle: r.subtitle,
+                    imagePath: 'assets/images/${r.key}.png',
+                    emoji: r.emoji,
+                    price: 99,
+                    accentColor: r.color,
+                  ),
                 );
               }).toList(),
             ),
@@ -512,6 +631,187 @@ class _ShopScreenState extends State<ShopScreen> {
       bottomSheet: _cartCount > 0
           ? _CartBar(count: _cartCount, total: _cartTotal, onTap: _openCart)
           : null,
+    );
+  }
+}
+
+class _QtyButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool filled;
+  final Color? color;
+  const _QtyButton({required this.icon, this.onTap, this.filled = false, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? SoilColors.primary;
+    final disabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34, height: 34,
+        decoration: BoxDecoration(
+          color: filled ? c : Colors.transparent,
+          border: Border.all(
+              color: disabled ? Colors.grey.shade300 : c, width: 1.5),
+          borderRadius: BorderRadius.circular(Sr.rSm),
+        ),
+        child: Icon(icon, size: 18,
+            color: filled ? Colors.white : (disabled ? Colors.grey.shade400 : c)),
+      ),
+    );
+  }
+}
+
+// ── Shop Item Card (2-column grid) ────────────────────────────────────────────
+class _ShopItemCard extends StatelessWidget {
+  final String imagePath, emoji, name, subtitle;
+  final int price, cartQty;
+  final Color accentColor;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+  final VoidCallback onTap;
+
+  const _ShopItemCard({
+    required this.imagePath,
+    required this.emoji,
+    required this.name,
+    required this.subtitle,
+    required this.price,
+    required this.accentColor,
+    required this.cartQty,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(Sr.rLg),
+          border: Border.all(color: cs.outline),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image area ───────────────────────────────
+            Expanded(
+              flex: 5,
+              child: Container(
+                width: double.infinity,
+                color: accentColor.withOpacity(0.1),
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                  ),
+                ),
+              ),
+            ),
+            // ── Info area ────────────────────────────────
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurface.withOpacity(0.45),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '₱$price',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: accentColor,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            if (cartQty > 0)
+                              Text('×$cartQty in cart',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      color: cs.onSurface.withOpacity(0.38))),
+                          ],
+                        ),
+                        // ── + button OR −/qty/+ stepper ──────────────────
+                        cartQty == 0
+                            ? GestureDetector(
+                          onTap: onAdd,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: accentColor,
+                              borderRadius: BorderRadius.circular(Sr.rMd),
+                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: Colors.white, size: 18),
+                          ),
+                        )
+                            : Row(mainAxisSize: MainAxisSize.min, children: [
+                          _QtyButton(
+                            icon: Icons.remove_rounded,
+                            color: accentColor,
+                            onTap: onRemove,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Text('$cartQty',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: accentColor)),
+                          ),
+                          _QtyButton(
+                            icon: Icons.add_rounded,
+                            color: accentColor,
+                            filled: true,
+                            onTap: onAdd,
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -815,129 +1115,6 @@ class _TikTokProductCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Reagent Card (2-column grid) ──────────────────────────────────────────────
-class _ShopItemCard extends StatelessWidget {
-  final String imagePath, emoji, name, subtitle;
-  final int price, cartQty;
-  final Color accentColor;
-  final VoidCallback onAdd;
-
-  const _ShopItemCard({
-    required this.imagePath,
-    required this.emoji,
-    required this.name,
-    required this.subtitle,
-    required this.price,
-    required this.accentColor,
-    required this.cartQty,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(Sr.rLg),
-        border: Border.all(color: cs.outline),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Image area ───────────────────────────────
-          Expanded(
-            flex: 5,
-            child: Container(
-              width: double.infinity,
-              color: accentColor.withOpacity(0.1),
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.contain,    // ← fitted image
-                errorBuilder: (_, __, ___) => Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 40)),
-                ),
-              ),
-            ),
-          ),
-          // ── Info area ────────────────────────────────
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: cs.onSurface.withOpacity(0.45),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '₱$price',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: accentColor,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          if (cartQty > 0)
-                            Text('×$cartQty in cart',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    color: cs.onSurface.withOpacity(0.38))),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: onAdd,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: accentColor,
-                            borderRadius: BorderRadius.circular(Sr.rMd),
-                          ),
-                          child: const Icon(Icons.add_rounded,
-                              color: Colors.white, size: 18),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
           ),
         ],
