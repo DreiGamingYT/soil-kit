@@ -15,9 +15,9 @@ class OrderService {
         String address = '',
       }) async {
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) throw Exception('Not signed in');
 
-    await _db.collection('orders').add({
+    final ref = await _db.collection('orders').add({
       'uid':           uid,
       'items':         items,
       'total':         total,
@@ -29,10 +29,13 @@ class OrderService {
           ?? '',
       'customerEmail': _auth.currentUser?.email ?? '',
       'createdAt':     FieldValue.serverTimestamp(),
+      'adminNote':     '',
     });
+
+    return ref.id;
   }
 
-  // Used by shop_screen.dart
+  // ── Customer: stream own orders ───────────────────────────────────────────
   Stream<QuerySnapshot<Map<String, dynamic>>> myOrders() {
     final uid = _auth.currentUser?.uid;
     return _db
@@ -41,4 +44,33 @@ class OrderService {
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
+
+  // ── Admin: stream ALL orders ──────────────────────────────────────────────
+  Stream<QuerySnapshot<Map<String, dynamic>>> allOrders({String? statusFilter}) {
+    Query<Map<String, dynamic>> q = _db
+        .collection('orders')
+        .orderBy('createdAt', descending: true);
+
+    if (statusFilter != null && statusFilter != 'all') {
+      q = q.where('status', isEqualTo: statusFilter);
+    }
+    return q.snapshots();
+  }
+
+  // ── Admin: update order status ────────────────────────────────────────────
+  Future<void> updateOrderStatus(
+      String orderId,
+      String newStatus, {
+        String adminNote = '',
+      }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status':    newStatus,
+      'adminNote': adminNote,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ── Admin: check if current user is admin ─────────────────────────────────
+  bool get isAdmin =>
+      _auth.currentUser?.email == 'gtechsolution.qcu@gmail.com';
 }

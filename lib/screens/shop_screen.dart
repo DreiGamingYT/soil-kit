@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 import '../services/order_service.dart';
+import '../services/email_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
@@ -1208,11 +1210,24 @@ class _CartSheetState extends State<_CartSheet> {
                               'price': c.price,
                             }).toList();
 
-                            await OrderService.instance.placeOrder(
+                            final orderId = await OrderService.instance.placeOrder(
                               items, widget.total,
                               contact: _contactCtrl.text.trim(),
                               address: _addressCtrl.text.trim(),
                             ).timeout(const Duration(seconds: 15));
+
+                            // Send email notification to admin — fire & forget
+                            final user = FirebaseAuth.instance.currentUser; 
+                            EmailService.notifyAdminNewOrder(
+                              orderId:       orderId,
+                              customerName:  user?.displayName
+                                  ?? user?.email?.split('@').first ?? 'Customer',
+                              customerEmail: user?.email ?? '',
+                              contact:       _contactCtrl.text.trim(),
+                              address:       _addressCtrl.text.trim(),
+                              items:         items,
+                              total:         widget.total,
+                            ).ignore(); // non-blocking
 
                             messenger.showSnackBar(
                               SnackBar(
