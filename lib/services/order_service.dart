@@ -5,10 +5,10 @@ class OrderService {
   OrderService._();
   static final instance = OrderService._();
 
-  final _db = FirebaseFirestore.instance;
+  final _db   = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  Future<void> placeOrder(
+  Future<String> placeOrder(                        // ✅ was Future<void>
       List<Map<String, dynamic>> items,
       int total, {
         String contact = '',
@@ -25,8 +25,7 @@ class OrderService {
       'contact':       contact,
       'address':       address,
       'customerName':  _auth.currentUser?.displayName
-          ?? _auth.currentUser?.email?.split('@').first
-          ?? '',
+          ?? _auth.currentUser?.email?.split('@').first ?? '',
       'customerEmail': _auth.currentUser?.email ?? '',
       'createdAt':     FieldValue.serverTimestamp(),
       'adminNote':     '',
@@ -35,7 +34,6 @@ class OrderService {
     return ref.id;
   }
 
-  // ── Customer: stream own orders ───────────────────────────────────────────
   Stream<QuerySnapshot<Map<String, dynamic>>> myOrders() {
     final uid = _auth.currentUser?.uid;
     return _db

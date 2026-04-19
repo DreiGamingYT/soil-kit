@@ -1217,7 +1217,7 @@ class _CartSheetState extends State<_CartSheet> {
                             ).timeout(const Duration(seconds: 15));
 
                             // Send email notification to admin — fire & forget
-                            final user = FirebaseAuth.instance.currentUser; 
+                            final user = FirebaseAuth.instance.currentUser;
                             EmailService.notifyAdminNewOrder(
                               orderId:       orderId,
                               customerName:  user?.displayName

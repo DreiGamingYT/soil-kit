@@ -164,10 +164,10 @@ class ImageAnalysisService {
   // ── Delta-E CIE94 (Feature 1) ──────────────────────────────────────────────
 
   double _deltaE94(List<double> lab1, List<double> lab2) {
-    final L1 = lab1[0]; final a1 = lab1[1]; final b1 = lab1[2];
-    final L2 = lab2[0]; final a2 = lab2[1]; final b2 = lab2[2];
+    final l1 = lab1[0]; final a1 = lab1[1]; final b1 = lab1[2];
+    final l2 = lab2[0]; final a2 = lab2[1]; final b2 = lab2[2];
 
-    final deltaL = L1 - L2;
+    final deltaL = l1 - l2;
     final c1 = sqrt(a1 * a1 + b1 * b1);
     final c2 = sqrt(a2 * a2 + b2 * b2);
     final deltaC = c1 - c2;

@@ -207,8 +207,9 @@ class _OrderDetailSheet extends StatelessWidget {
       (l: 'Preparing', i: Icons.hourglass_bottom_rounded),
       (l: 'Shipped',   i: Icons.local_shipping_rounded),
       (l: 'Delivered', i: Icons.check_circle_rounded),
+      (l: 'Cancelled', i: Icons.cancel_rounded),
     ];
-    const statusKeys = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered'];
+    const statusKeys = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
     final curStep = statusKeys.indexOf(status);
 
     return Container(
