@@ -1216,19 +1216,6 @@ class _CartSheetState extends State<_CartSheet> {
                               address: _addressCtrl.text.trim(),
                             ).timeout(const Duration(seconds: 15));
 
-                            // Send email notification to admin — fire & forget
-                            final user = FirebaseAuth.instance.currentUser;
-                            EmailService.notifyAdminNewOrder(
-                              orderId:       orderId,
-                              customerName:  user?.displayName
-                                  ?? user?.email?.split('@').first ?? 'Customer',
-                              customerEmail: user?.email ?? '',
-                              contact:       _contactCtrl.text.trim(),
-                              address:       _addressCtrl.text.trim(),
-                              items:         items,
-                              total:         widget.total,
-                            ).ignore(); // non-blocking
-
                             messenger.showSnackBar(
                               SnackBar(
                                 content: const Row(children: [
@@ -1242,9 +1229,36 @@ class _CartSheetState extends State<_CartSheet> {
                                     borderRadius: BorderRadius.circular(Sr.rSm)),
                               ),
                             );
+
+                            // ── Navigate first so pop doesn't cancel the email ──
                             nav.pop();
                             widget.onOrderPlaced();
 
+                            // Send email notification to admin — fire & forget
+                            final user = FirebaseAuth.instance.currentUser;
+                            final customerEmail = user?.email ?? '';
+                            final customerName  = user?.displayName
+                                ?? user?.email?.split('@').first ?? 'Customer';
+
+                            await EmailService.notifyAdminNewOrder(
+                              orderId:       orderId,
+                              customerName:  customerName,
+                              customerEmail: customerEmail,
+                              contact:       _contactCtrl.text.trim(),
+                              address:       _addressCtrl.text.trim(),
+                              items:         items,
+                              total:         widget.total,
+                            );
+
+                            await EmailService.notifyCustomerOrderStatus(
+                              orderId:       orderId,
+                              customerEmail: customerEmail,
+                              customerName:  customerName,
+                              status:        'pending',
+                              adminNote:     '',
+                              items:         items,
+                              total:         widget.total,
+                            );
                           } catch (e) {
                             messenger.showSnackBar(
                               SnackBar(content: Text('Order failed: $e'), backgroundColor: Colors.red),
