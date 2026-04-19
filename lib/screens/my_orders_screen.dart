@@ -202,12 +202,13 @@ class _OrderDetailSheet extends StatelessWidget {
     final (_, col, _) = _statusInfo(status);
 
     const steps = [
-      (l: 'Pending',    i: Icons.schedule_rounded),
-      (l: 'Approved',   i: Icons.verified_rounded),
-      (l: 'Packed',     i: Icons.inventory_2_rounded),
-      (l: 'To Receive', i: Icons.local_shipping_rounded),
+      (l: 'Pending',   i: Icons.schedule_rounded),
+      (l: 'Confirmed', i: Icons.verified_rounded),
+      (l: 'Preparing', i: Icons.hourglass_bottom_rounded),
+      (l: 'Shipped',   i: Icons.local_shipping_rounded),
+      (l: 'Delivered', i: Icons.check_circle_rounded),
     ];
-    const statusKeys = ['pending', 'approved', 'packed', 'to_receive'];
+    const statusKeys = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered'];
     final curStep = statusKeys.indexOf(status);
 
     return Container(
@@ -428,9 +429,11 @@ class _InfoRow extends StatelessWidget {
 
 (String, Color, IconData) _statusInfo(String s) {
   switch (s) {
-    case 'approved':   return ('Approved',   Colors.blue,   Icons.verified_rounded);
-    case 'packed':     return ('Packed',     Colors.orange, Icons.inventory_2_rounded);
-    case 'to_receive': return ('To Receive', Colors.green,  Icons.local_shipping_rounded);
-    default:           return ('Pending',    SoilColors.clay, Icons.schedule_rounded);
+    case 'confirmed':  return ('Confirmed',   Colors.blue,   Icons.verified_rounded);
+    case 'preparing':  return ('Preparing',   Colors.purple, Icons.hourglass_bottom_rounded);
+    case 'shipped':    return ('Shipped',     Colors.orange, Icons.local_shipping_rounded);
+    case 'delivered':  return ('Delivered',   Colors.green,  Icons.check_circle_rounded);
+    case 'cancelled':  return ('Cancelled',   Colors.red,    Icons.cancel_rounded);
+    default:           return ('Pending',     SoilColors.clay, Icons.schedule_rounded);
   }
 }

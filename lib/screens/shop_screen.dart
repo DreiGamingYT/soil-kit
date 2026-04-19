@@ -283,21 +283,29 @@ class _ShopScreenState extends State<ShopScreen> {
                       final data = docs[index].data();
                       final status = data['status'] ?? 'pending';
 
+                      // Inside the StreamBuilder's itemBuilder, replace the switch block:
                       Color statusColor;
                       IconData icon;
-
                       switch (status) {
-                        case 'approved':
+                        case 'confirmed':
                           statusColor = Colors.blue;
                           icon = Icons.verified_rounded;
                           break;
-                        case 'packed':
-                          statusColor = Colors.orange;
-                          icon = Icons.inventory_2_rounded;
+                        case 'preparing':
+                          statusColor = Colors.purple;
+                          icon = Icons.hourglass_bottom_rounded;
                           break;
-                        case 'to_receive':
-                          statusColor = Colors.green;
+                        case 'shipped':
+                          statusColor = Colors.orange;
                           icon = Icons.local_shipping_rounded;
+                          break;
+                        case 'delivered':
+                          statusColor = Colors.green;
+                          icon = Icons.check_circle_rounded;
+                          break;
+                        case 'cancelled':
+                          statusColor = Colors.red;
+                          icon = Icons.cancel_rounded;
                           break;
                         default:
                           statusColor = SoilColors.clay;
@@ -354,7 +362,7 @@ class _ShopScreenState extends State<ShopScreen> {
                             Expanded(
                               child: Text(
                                 (data['items'] as List)
-                                    .map((e) => '${e['qty']}x ${e['name']}')
+                                    .map((e) => '${e['qty']}x ${e['label'] ?? e['name'] ?? ''}')
                                     .join('\n'),
                                 maxLines: 4,
                                 overflow: TextOverflow.ellipsis,
@@ -1194,7 +1202,10 @@ class _CartSheetState extends State<_CartSheet> {
 
                           try {
                             final items = widget.cart.map((c) => {
-                              'name': c.label, 'qty': c.qty, 'price': c.price
+                              'key':   c.key,
+                              'label': c.label,
+                              'qty':   c.qty,
+                              'price': c.price,
                             }).toList();
 
                             await OrderService.instance.placeOrder(
