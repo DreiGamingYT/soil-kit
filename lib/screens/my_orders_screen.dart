@@ -142,7 +142,7 @@ class _OrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w800, color: SoilColors.primary))),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Text(item['name'] ?? '',
+              Expanded(child: Text(item['label'] ?? item['name'] ?? '',
                   style: TextStyle(fontSize: 12.5,
                       color: cs.onSurface.withOpacity(0.7)),
                   overflow: TextOverflow.ellipsis)),
@@ -334,7 +334,7 @@ class _OrderDetailSheet extends StatelessWidget {
                           Expanded(child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item['name'] ?? '',
+                                Text(item['label'] ?? item['name'] ?? '',
                                     style: const TextStyle(fontSize: 13.5,
                                         fontWeight: FontWeight.w600)),
                                 Text('₱${item['price']} each',

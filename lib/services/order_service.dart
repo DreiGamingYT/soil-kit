@@ -18,13 +18,17 @@ class OrderService {
     if (uid == null) return;
 
     await _db.collection('orders').add({
-      'uid':       uid,
-      'items':     items,
-      'total':     total,
-      'status':    'pending',
-      'contact':   contact,
-      'address':   address,
-      'createdAt': FieldValue.serverTimestamp(),
+      'uid':           uid,
+      'items':         items,
+      'total':         total,
+      'status':        'pending',
+      'contact':       contact,
+      'address':       address,
+      'customerName':  _auth.currentUser?.displayName
+          ?? _auth.currentUser?.email?.split('@').first
+          ?? '',
+      'customerEmail': _auth.currentUser?.email ?? '',
+      'createdAt':     FieldValue.serverTimestamp(),
     });
   }
 
