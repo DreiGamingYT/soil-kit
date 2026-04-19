@@ -4,19 +4,21 @@ import '../main.dart';
 import '../services/order_service.dart';
 import '../services/email_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'my_orders_screen.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
 class _Reagent {
-  final String name, subtitle, icon;
-  const _Reagent(this.name, this.subtitle, this.icon);
+  final String name, subtitle, emoji, key;
+  final Color color;
+  const _Reagent(this.name, this.subtitle, this.emoji, this.key, this.color);
 }
 
 const _reagents = [
-  _Reagent('Nitrogen (N)', 'Measures available nitrogen in soil', '🟦'),
-  _Reagent('Phosphorus (P)', 'Detects phosphate concentration', '🟧'),
-  _Reagent('Potassium (K)', 'Tests potassium (potash) levels', '🟪'),
-  _Reagent('pH Indicator', 'Measures soil acidity or alkalinity', '🟩'),
-  _Reagent('Ammonium Nitrate', 'Provides nitrogen (fertilizer, not a test reagent)', '🟫'),
+  _Reagent('Nitrogen (N)',     'Measures available nitrogen',      '🟦', 'reagent_n',  Color(0xFF1976D2)),
+  _Reagent('Phosphorus (P)',   'Detects phosphate concentration',  '🟧', 'reagent_p',  Color(0xFFF57C00)),
+  _Reagent('Potassium (K)',    'Tests potassium (potash) levels',  '🟪', 'reagent_k',  Color(0xFF7B1FA2)),
+  _Reagent('pH Indicator',    'Measures soil acidity/alkalinity', '🟩', 'reagent_ph', Color(0xFF388E3C)),
+  _Reagent('Ammonium Nitrate','Nitrogen fertilizer supplement',   '🟫', 'reagent_an', Color(0xFF5D4037)),
 ];
 
 // ── Cart item ─────────────────────────────────────────────────────────────────
@@ -66,20 +68,6 @@ class _ShopScreenState extends State<ShopScreen> {
         duration: const Duration(milliseconds: 1400),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sr.rSm)),
         backgroundColor: SoilColors.primary,
-      ),
-    );
-  }
-
-  void _openReagentModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ReagentModal(
-        onSelect: (r) {
-          Navigator.pop(context);
-          _addCartItem('reagent_${r.name}', '${r.name} Reagent', 99);
-        },
       ),
     );
   }
@@ -214,20 +202,37 @@ class _ShopScreenState extends State<ShopScreen> {
 
             const SizedBox(height: 24),
 
-            Text(
-              'My Orders',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-                letterSpacing: -0.2,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'My Orders',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const MyOrdersScreen())),
+                  child: Text(
+                    'See All →',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: SoilColors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 12),
 
             SizedBox(
-              height: 170,
+              height: 150,
               child: StreamBuilder(
                 stream: OrderService.instance.myOrders(),
                 builder: (context, snapshot) {
@@ -315,7 +320,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       }
 
                       return Container(
-                        width: 240,
+                        width: 200,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: cs.surface,
@@ -386,6 +391,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
             const SizedBox(height: 26),
 
+            // ── Featured Product (TikTok-style full-width) ────────────────────────
             Text(
               'Products',
               style: TextStyle(
@@ -397,55 +403,77 @@ class _ShopScreenState extends State<ShopScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ── Row 1: Test Kit + Reagent (2-column grid) ────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.72,
               children: [
-                Expanded(
-                  child: _GridProductCard(
-                    emoji: '🧺',
-                    title: '1 Set Test Kit',
-                    price: 349,
-                    badge: 'Complete Kit',
-                    badgeColor: SoilColors.primary,
-                    cartQty: _cart
-                        .where((c) => c.key == 'test_kit')
-                        .fold(0, (a, b) => a + b.qty),
-                    onAdd: () => _addCartItem('test_kit', '1 Set Test Kit', 349),
-                  ),
+                // ── Test Kit ──────────────────────────────────────
+                _ShopItemCard(
+                  imagePath: 'assets/images/test_kit.png',
+                  emoji: '🧺',
+                  name: '1 Set Test Kit',
+                  subtitle: 'Complete kit with all reagents & tools',
+                  price: 349,
+                  accentColor: SoilColors.primary,
+                  cartQty: _cart.where((c) => c.key == 'test_kit').fold(0, (a, b) => a + b.qty),
+                  onAdd: () => _addCartItem('test_kit', '1 Set Test Kit', 349),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _GridProductCard(
-                    emoji: '💧',
-                    title: '1 Reagent (Any Type)',
-                    price: 99,
-                    badge: 'Choose Type',
-                    badgeColor: SoilColors.harvest,
-                    cartQty: _cart
-                        .where((c) => c.key.startsWith('reagent_'))
-                        .fold(0, (a, b) => a + b.qty),
-                    onAdd: _openReagentModal,
-                    isChooser: true,
-                  ),
+                // ── Test Tube ─────────────────────────────────────
+                _ShopItemCard(
+                  imagePath: 'assets/images/test_tube.png',
+                  emoji: '🔬',
+                  name: 'Test Tubes & Droplets',
+                  subtitle: 'Borosilicate glass + precision dropper',
+                  price: 29,
+                  accentColor: const Color(0xFF546E7A),
+                  cartQty: _cart.where((c) => c.key == 'tube_dropper').fold(0, (a, b) => a + b.qty),
+                  onAdd: () => _addCartItem('tube_dropper', 'Test Tubes & Droplets', 29),
                 ),
               ],
             ),
 
+            const SizedBox(height: 20),
+
+            Text(
+              'Reagents',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '₱99 each',
+              style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
+            ),
             const SizedBox(height: 12),
 
-            // ── Row 2: Test Tubes (full-width horizontal card) ────────────────
-            _ProductCard(
-              emoji: '🔬',
-              title: 'Test Tubes & Droplets (1 pc)',
-              description:
-              'Borosilicate glass test tube + precision dropper. Replacement or extra for your soil tests.',
-              price: 29,
-              cartQty: _cart
-                  .where((c) => c.key == 'tube_dropper')
-                  .fold(0, (a, b) => a + b.qty),
-              onAdd: () =>
-                  _addCartItem('tube_dropper', 'Test Tubes & Droplets', 29),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.72,
+              children: _reagents.map((r) {
+                final qty = _cart.where((c) => c.key == r.key).fold(0, (a, b) => a + b.qty);
+                return _ShopItemCard(
+                  imagePath: 'assets/images/${r.key}.png',
+                  emoji: r.emoji,
+                  name: r.name,
+                  subtitle: r.subtitle,
+                  price: 99,
+                  accentColor: r.color,
+                  cartQty: qty,
+                  onAdd: () => _addCartItem(r.key, '${r.name} Reagent', 99),
+                );
+              }).toList(),
             ),
 
             const SizedBox(height: 32),
@@ -638,6 +666,286 @@ class _GridProductCard extends StatelessWidget {
   }
 }
 
+// ── TikTok-style Full-Width Product Card ──────────────────────────────────────
+class _TikTokProductCard extends StatelessWidget {
+  final List<Color> gradientColors;
+  final String emoji, title, description;
+  final int price, cartQty;
+  final String? badge;
+  final VoidCallback onAdd;
+  final String? imagePath;
+
+  const _TikTokProductCard({
+    required this.gradientColors,
+    required this.emoji,
+    required this.title,
+    required this.description,
+    required this.price,
+    required this.cartQty,
+    required this.onAdd,
+    this.badge,
+    this.imagePath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(Sr.rLg),
+        border: Border.all(color: cs.outline),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Image area ──────────────────────────────────────────────
+          Container(
+            height: 140,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: imagePath != null
+                      ? Image.asset(imagePath!, fit: BoxFit.contain, height: 100)
+                      : Text(emoji, style: const TextStyle(fontSize: 64)),
+                ),
+                if (badge != null)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(Sr.rPill),
+                      ),
+                      child: Text(
+                        badge!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (cartQty > 0)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(Sr.rPill),
+                      ),
+                      child: Text(
+                        '×$cartQty in cart',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // ── Info area ───────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withOpacity(0.5),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '₱$price',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: SoilColors.primary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+                  label: const Text('Add'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Reagent Card (2-column grid) ──────────────────────────────────────────────
+class _ShopItemCard extends StatelessWidget {
+  final String imagePath, emoji, name, subtitle;
+  final int price, cartQty;
+  final Color accentColor;
+  final VoidCallback onAdd;
+
+  const _ShopItemCard({
+    required this.imagePath,
+    required this.emoji,
+    required this.name,
+    required this.subtitle,
+    required this.price,
+    required this.accentColor,
+    required this.cartQty,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(Sr.rLg),
+        border: Border.all(color: cs.outline),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Image area ───────────────────────────────
+          Expanded(
+            flex: 5,
+            child: Container(
+              width: double.infinity,
+              color: accentColor.withOpacity(0.1),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,    // ← fitted image
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                ),
+              ),
+            ),
+          ),
+          // ── Info area ────────────────────────────────
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: cs.onSurface.withOpacity(0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '₱$price',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: accentColor,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          if (cartQty > 0)
+                            Text('×$cartQty in cart',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: cs.onSurface.withOpacity(0.38))),
+                        ],
+                      ),
+                      GestureDetector(
+                        onTap: onAdd,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(Sr.rMd),
+                          ),
+                          child: const Icon(Icons.add_rounded,
+                              color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Product Card ──────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   final String emoji, title, description;
@@ -780,133 +1088,6 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Reagent Modal ─────────────────────────────────────────────────────────────
-class _ReagentModal extends StatelessWidget {
-  final void Function(_Reagent) onSelect;
-  const _ReagentModal({required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? SoilColors.surfaceDark : SoilColors.surfaceLight,
-        borderRadius:
-        const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outline,
-                borderRadius: BorderRadius.circular(Sr.rPill),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Select Reagent',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '₱99 per reagent — tap to add to cart',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: cs.onSurface.withOpacity(0.45),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          ...List.generate(_reagents.length, (i) {
-            final r = _reagents[i];
-            return Column(
-              children: [
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    indent: 20,
-                    endIndent: 20,
-                    color: cs.outline.withOpacity(0.5),
-                  ),
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: SoilColors.primaryLight.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child:
-                    Center(child: Text(r.icon, style: const TextStyle(fontSize: 20))),
-                  ),
-                  title: Text(
-                    r.name,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  subtitle: Text(
-                    r.subtitle,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: cs.onSurface.withOpacity(0.45),
-                    ),
-                  ),
-                  trailing: Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: SoilColors.primaryLight,
-                      borderRadius: BorderRadius.circular(Sr.rPill),
-                    ),
-                    child: const Text(
-                      '+ Add',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: SoilColors.primary,
-                      ),
-                    ),
-                  ),
-                  onTap: () => onSelect(r),
-                  contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                ),
-              ],
-            );
-          }),
-          const SizedBox(height: 8),
         ],
       ),
     );

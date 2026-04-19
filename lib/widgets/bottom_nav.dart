@@ -1,14 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 
-/// Nav indices (regular tabs):
-///   0 → Home
-///   1 → Color
-///   2 → Soil
-///   3 → Cart / Shop
-///   4 → Notes
-///
-/// Dashboard (History) is a floating circle at the top-right corner.
 /// Use [onDashboardTap] or pass index 5 through [onTap].
 class AppBottomNav extends StatelessWidget {
   final int selectedIndex;
@@ -47,116 +39,13 @@ class AppBottomNav extends StatelessWidget {
           top: BorderSide(color: cs.outline.withValues(alpha: 0.5), width: 1),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-
-          // ── Floating Dashboard circle (top-right) ────────────────────────
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 2, bottom: 6),
-              child: GestureDetector(
-                onTap: onDashboardTap ?? () => onTap(5),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: isDashboardSelected
-                        ? const LinearGradient(
-                      colors: [SoilColors.primary, SoilColors.primaryMid],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                        : null,
-                    color: isDashboardSelected
-                        ? null
-                        : (isDark
-                        ? SoilColors.surfaceElevDark
-                        : SoilColors.surfaceElevLight),
-                    border: isDashboardSelected
-                        ? null
-                        : Border.all(color: cs.outline, width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: SoilColors.primary.withValues(
-                            alpha: isDashboardSelected ? 0.32 : 0.10),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      isDashboardSelected
-                          ? Icons.bar_chart_rounded
-                          : Icons.bar_chart_outlined,
-                      key: ValueKey(isDashboardSelected),
-                      color: isDashboardSelected
-                          ? Colors.white
-                          : cs.onSurface.withValues(alpha: 0.45),
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Nav tabs row ─────────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home_rounded,
-                  label: 'Home',
-                  isSelected: selectedIndex == 0,
-                  onTap: () => onTap(0),
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.palette_outlined,
-                  activeIcon: Icons.palette_rounded,
-                  label: 'Color',
-                  isSelected: selectedIndex == 1,
-                  onTap: () => onTap(1),
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.terrain_outlined,
-                  activeIcon: Icons.terrain_rounded,
-                  label: 'Soil',
-                  isSelected: selectedIndex == 2,
-                  onTap: () => onTap(2),
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.shopping_cart_outlined,
-                  activeIcon: Icons.shopping_cart_rounded,
-                  label: 'Cart',
-                  isSelected: selectedIndex == 3,
-                  onTap: () => onTap(3),
-                  badge: cartCount > 0 ? cartCount : null,
-                ),
-              ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.edit_note_outlined,
-                  activeIcon: Icons.edit_note_rounded,
-                  label: 'Notes',
-                  isSelected: selectedIndex == 4,
-                  onTap: () => onTap(4),
-                ),
-              ),
-            ],
-          ),
+          Expanded(child: _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home', isSelected: selectedIndex == 0, onTap: () => onTap(0))),
+          Expanded(child: _NavItem(icon: Icons.palette_outlined, activeIcon: Icons.palette_rounded, label: 'Color', isSelected: selectedIndex == 1, onTap: () => onTap(1))),
+          Expanded(child: _NavItem(icon: Icons.terrain_outlined, activeIcon: Icons.terrain_rounded, label: 'Soil', isSelected: selectedIndex == 2, onTap: () => onTap(2))),
+          Expanded(child: _NavItem(icon: Icons.shopping_cart_outlined, activeIcon: Icons.shopping_cart_rounded, label: 'Shop', isSelected: selectedIndex == 3, onTap: () => onTap(3), badge: cartCount > 0 ? cartCount : null)),
+          Expanded(child: _NavItem(icon: Icons.edit_note_outlined, activeIcon: Icons.edit_note_rounded, label: 'Notes', isSelected: selectedIndex == 4, onTap: () => onTap(4))),
         ],
       ),
     );

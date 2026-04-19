@@ -51,6 +51,14 @@ class HomeScreen extends StatelessWidget {
           onTap: (i) => onNavTap(i),
           onDashboardTap: () => onNavTap(5),
         ),
+
+        floatingActionButton: selectedIndex == 3
+            ? null
+            : _DashboardFab(
+          isSelected: selectedIndex == 5,
+          onTap: () => onNavTap(5),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
   }
@@ -186,8 +194,8 @@ class _HomeBody extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => _goToCamera(context),
                   child: Container(
-                    width: 132,
-                    height: 132,
+                    width: 164,
+                    height: 164,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
@@ -198,12 +206,13 @@ class _HomeBody extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.camera_alt_rounded,
-                            color: Colors.white, size: 48),
+                            color: Colors.white, size: 70),
                         SizedBox(height: 8),
                         Text('SCAN',
                             style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w800)),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18)),
                       ],
                     ),
                   ),
@@ -221,6 +230,49 @@ class _HomeBody extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardFab extends StatelessWidget {
+  final bool isSelected;
+  final VoidCallback onTap;
+  const _DashboardFab({required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: isSelected
+              ? const LinearGradient(
+            colors: [SoilColors.primary, SoilColors.primaryMid],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+              : null,
+          color: isSelected ? null : Theme.of(context).colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: SoilColors.primary.withOpacity(isSelected ? 0.4 : 0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          isSelected ? Icons.bar_chart_rounded : Icons.bar_chart_outlined,
+          color: isSelected
+              ? Colors.white
+              : Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
+          size: 24,
         ),
       ),
     );
