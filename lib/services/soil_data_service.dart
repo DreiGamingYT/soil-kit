@@ -1,6 +1,8 @@
 import '../models/soil_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Simple in-memory singleton that keeps results & notes alive across screens.
 class SoilDataService {
@@ -85,6 +87,27 @@ class SoilDataService {
     await prefs.setStringList('soil_results', encoded);
 
     if (!saveToFirestore) _pendingSync.add(r);
+  }
+
+  // Add in soil_data_service.dart after the addResult() method
+  Future<void> syncPending(FirebaseFirestore db) async {
+    final toSync = List<SoilResult>.from(_pendingSync);
+    for (final r in toSync) {
+      try {
+        await db.collection('soil_results').add({
+          'userId': FirebaseAuth.instance.currentUser?.uid,
+          'soilType': r.soilType,
+          'date': r.date.toIso8601String(),
+          'overallScore': r.overallScore,
+          'status': r.status,
+          'nitrogenLevel': r.nitrogenLevel,
+          'phosphorusLevel': r.phosphorusLevel,
+          'potassiumLevel': r.potassiumLevel,
+          'ph': r.ph,
+        });
+        _pendingSync.remove(r);
+      } catch (_) {}
+    }
   }
 
 // Add a new method after addResult:

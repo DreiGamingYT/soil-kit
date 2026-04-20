@@ -19,6 +19,13 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  Connectivity().onConnectivityChanged.listen((result) {
+    if (result != ConnectivityResult.none &&
+        SoilDataService.instance.hasPendingSync) {
+      SoilDataService.instance.syncPending(FirebaseFirestore.instance);
+    }
+  });
+
   NotificationService.instance.init();
 
   await SoilDataService.instance.loadFromLocal();
