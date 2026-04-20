@@ -45,8 +45,11 @@ class _ShopScreenState extends State<ShopScreen> {
   int get _cartCount => _cart.fold(0, (a, b) => a + b.qty);
   int get _cartTotal => _cart.fold(0, (a, b) => a + b.price * b.qty);
 
-  // Add field:
-  Map<String, int> _stockMap = {};
+  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _reagentProducts = [];
+
+  int _stockOf(String id) => _products
+      .firstWhere((p) => p['id'] == id, orElse: () => {})['stock'] as int? ?? 0;
 
   @override
   void initState() {
@@ -55,10 +58,19 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   void _listenStock() {
-    FirebaseFirestore.instance.collection('products').snapshots().listen((snap) {
+    FirebaseFirestore.instance
+        .collection('products')
+        .where('active', isEqualTo: true)
+        .snapshots()
+        .listen((snap) {
       if (!mounted) return;
+      final all = snap.docs
+          .map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>})
+          .toList();
       setState(() {
-        _stockMap = { for (final d in snap.docs) d.id: (d['stock'] as num?)?.toInt() ?? 0 };
+        // BUG FIX 6: split products into two separate lists by type
+        _products        = all.where((p) => p['type'] != 'reagent').toList();
+        _reagentProducts = all.where((p) => p['type'] == 'reagent').toList();
       });
     });
   }
@@ -103,11 +115,12 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
+  // BUG FIX 4 & 5: renamed 'imagePath' → 'imageUrl', use Image.network inside modal
   void _showProductDetail({
     required String key,
     required String name,
     required String subtitle,
-    required String imagePath,
+    required String imageUrl,   // FIX 4: was 'imagePath'
     required String emoji,
     required int price,
     required Color accentColor,
@@ -139,9 +152,15 @@ class _ShopScreenState extends State<ShopScreen> {
               Container(
                 height: 220, width: double.infinity,
                 color: accentColor.withOpacity(0.1),
-                child: Image.asset(imagePath, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) =>
-                        Center(child: Text(emoji, style: const TextStyle(fontSize: 72)))),
+                // FIX 5: use Image.network instead of Image.asset
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      Center(child: Text(emoji, style: const TextStyle(fontSize: 72))),
+                )
+                    : Center(child: Text(emoji, style: const TextStyle(fontSize: 72))),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -206,6 +225,54 @@ class _ShopScreenState extends State<ShopScreen> {
           onOrderPlaced: () => setState(() => _cart.clear()),
         ),
       ),
+    );
+  }
+
+  Widget _buildProductGrid(List<Map<String, dynamic>> products) {
+    if (products.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 0.72,
+      children: products.map((p) {
+        final id       = p['id'] as String;
+        final name     = p['name'] as String? ?? '';
+        final price    = (p['price'] as num?)?.toInt() ?? 0;
+        final stock    = (p['stock'] as num?)?.toInt() ?? 0;
+        final imageUrl = p['imageUrl'] as String? ?? '';
+        final cartQty  = _cart.where((c) => c.key == id).fold(0, (a, b) => a + b.qty);
+
+        return _ShopItemCard(
+          imageUrl: imageUrl,   // FIX 1: was 'imagePath:'
+          emoji: '🧪',
+          name: name,
+          subtitle: p['subtitle'] as String? ?? '',
+          price: price,
+          accentColor: SoilColors.primary,
+          stock: stock,
+          cartQty: cartQty,
+          onAdd: () => _addCartItem(id, name, price),
+          onRemove: () => _removeCartItem(id),
+          onTap: () => _showProductDetail(
+            key: id, name: name,
+            subtitle: p['subtitle'] as String? ?? '',
+            imageUrl: imageUrl,  // FIX 4: matches renamed param
+            emoji: '🧪', price: price,
+            accentColor: SoilColors.primary,
+            stock: stock,
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -369,9 +436,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   }
 
                   if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   final docs = snapshot.data!.docs;
@@ -387,9 +452,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       child: Center(
                         child: Text(
                           'No orders yet',
-                          style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.5),
-                          ),
+                          style: TextStyle(color: cs.onSurface.withOpacity(0.5)),
                         ),
                       ),
                     );
@@ -400,10 +463,9 @@ class _ShopScreenState extends State<ShopScreen> {
                     itemCount: docs.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (context, index) {
-                      final data = docs[index].data();
+                      final data   = docs[index].data();
                       final status = data['status'] ?? 'pending';
 
-                      // Inside the StreamBuilder's itemBuilder, replace the switch block:
                       Color statusColor;
                       IconData icon;
                       switch (status) {
@@ -449,9 +511,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                 const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
+                                      horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
                                     color: statusColor.withOpacity(0.12),
                                     borderRadius: BorderRadius.circular(Sr.rPill),
@@ -502,7 +562,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
             const SizedBox(height: 26),
 
-            // ── Featured Product (TikTok-style full-width) ────────────────────────
+            // ── Products ─────────────────────────────────────────────────────
             Text(
               'Products',
               style: TextStyle(
@@ -513,67 +573,12 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.72,
-              children: [
-                // ── Test Kit ──────────────────────────────────────
-                _ShopItemCard(
-                  imagePath: 'assets/images/test_kit.png',
-                  emoji: '🧺',
-                  name: '1 Set Test Kit',
-                  subtitle: 'Complete kit with all reagents & tools',
-                  price: 349,
-                  accentColor: SoilColors.primary,
-                  // Non-reagent products default to always available (no Firestore stock doc)
-                  stock: _stockMap['test_kit'] ?? 99,
-                  cartQty: _cart.where((c) => c.key == 'test_kit').fold(0, (a, b) => a + b.qty),
-                  onAdd: () => _addCartItem('test_kit', '1 Set Test Kit', 349),
-                  onRemove: () => _removeCartItem('test_kit'),
-                  onTap: () => _showProductDetail(
-                    key: 'test_kit',
-                    name: '1 Set Test Kit',
-                    subtitle: 'Complete kit with all reagents & tools',
-                    imagePath: 'assets/images/test_kit.png',
-                    emoji: '🧺',
-                    price: 349,
-                    accentColor: SoilColors.primary,
-                    stock: _stockMap['test_kit'] ?? 99,
-                  ),
-                ),
-                // ── Test Tube ─────────────────────────────────────
-                _ShopItemCard(
-                  imagePath: 'assets/images/test_tube.png',
-                  emoji: '🔬',
-                  name: 'Test Tubes & Droplets',
-                  subtitle: 'Borosilicate glass + precision dropper',
-                  price: 29,
-                  accentColor: const Color(0xFF546E7A),
-                  stock: _stockMap['tube_dropper'] ?? 99,
-                  cartQty: _cart.where((c) => c.key == 'tube_dropper').fold(0, (a, b) => a + b.qty),
-                  onAdd: () => _addCartItem('tube_dropper', 'Test Tubes & Droplets', 29),
-                  onRemove: () => _removeCartItem('tube_dropper'),
-                  onTap: () => _showProductDetail(
-                    key: 'tube_dropper',
-                    name: 'Test Tubes & Droplets',
-                    subtitle: 'Borosilicate glass + precision dropper',
-                    imagePath: 'assets/images/test_tube.png',
-                    emoji: '🔬',
-                    price: 29,
-                    accentColor: const Color(0xFF546E7A),
-                    stock: _stockMap['tube_dropper'] ?? 99,
-                  ),
-                ),
-              ],
-            ),
+            // FIX 6: pass _products (non-reagent items only)
+            _buildProductGrid(_products),
 
             const SizedBox(height: 20),
 
+            // ── Reagents ─────────────────────────────────────────────────────
             Text(
               'Reagents',
               style: TextStyle(
@@ -589,42 +594,8 @@ class _ShopScreenState extends State<ShopScreen> {
               style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
             ),
             const SizedBox(height: 12),
-
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.72,
-              children: _reagents.map((r) {
-                final qty   = _cart.where((c) => c.key == r.key).fold(0, (a, b) => a + b.qty);
-                // ── CHANGE: read live stock for this reagent ──────────────────
-                final stock = _stockMap[r.key] ?? 0;
-                return _ShopItemCard(
-                  imagePath: 'assets/images/${r.key}.png',
-                  emoji: r.emoji,
-                  name: r.name,
-                  subtitle: r.subtitle,
-                  price: 99,
-                  accentColor: r.color,
-                  stock: stock,
-                  cartQty: qty,
-                  onAdd: () => _addCartItem(r.key, '${r.name} Reagent', 99),
-                  onRemove: () => _removeCartItem(r.key),
-                  onTap: () => _showProductDetail(
-                    key: r.key,
-                    name: r.name,
-                    subtitle: r.subtitle,
-                    imagePath: 'assets/images/${r.key}.png',
-                    emoji: r.emoji,
-                    price: 99,
-                    accentColor: r.color,
-                    stock: stock,
-                  ),
-                );
-              }).toList(),
-            ),
+            // FIX 6: pass _reagentProducts (reagent items only)
+            _buildProductGrid(_reagentProducts),
 
             const SizedBox(height: 32),
 
@@ -696,22 +667,22 @@ class _QtyButton extends StatelessWidget {
 
 // ── Shop Item Card (2-column grid) ────────────────────────────────────────────
 class _ShopItemCard extends StatelessWidget {
-  final String imagePath, emoji, name, subtitle;
-  final int price, cartQty, stock;   // ← stock added
+  final String imageUrl, emoji, name, subtitle;   // FIX 1: imageUrl (not imagePath)
+  final int price, cartQty, stock;
   final Color accentColor;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
   final VoidCallback onTap;
 
   const _ShopItemCard({
-    required this.imagePath,
+    required this.imageUrl,        // FIX 1: was 'this.imagePath'
     required this.emoji,
     required this.name,
     required this.subtitle,
     required this.price,
     required this.accentColor,
     required this.cartQty,
-    required this.stock,              // ← stock added
+    required this.stock,
     required this.onAdd,
     required this.onRemove,
     required this.onTap,
@@ -719,7 +690,7 @@ class _ShopItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs        = Theme.of(context).colorScheme;
+    final cs         = Theme.of(context).colorScheme;
     final outOfStock = stock == 0;
 
     return GestureDetector(
@@ -740,17 +711,25 @@ class _ShopItemCard extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 color: accentColor.withOpacity(outOfStock ? 0.05 : 0.1),
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
-                  // Dim image when out of stock
-                  color: outOfStock ? Colors.white.withOpacity(0.4) : null,
-                  colorBlendMode: outOfStock ? BlendMode.modulate : null,
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Opacity(
-                      opacity: outOfStock ? 0.4 : 1.0,
-                      child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                // FIX 2: use Image.network instead of Image.asset
+                child: imageUrl.isNotEmpty
+                    ? Opacity(
+                  opacity: outOfStock ? 0.4 : 1.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Opacity(
+                        opacity: outOfStock ? 0.4 : 1.0,
+                        child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                      ),
                     ),
+                  ),
+                )
+                    : Center(
+                  child: Opacity(
+                    opacity: outOfStock ? 0.4 : 1.0,
+                    child: Text(emoji, style: const TextStyle(fontSize: 40)),
                   ),
                 ),
               ),
@@ -773,7 +752,7 @@ class _ShopItemCard extends StatelessWidget {
                         color: cs.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       subtitle,
                       maxLines: 1,
@@ -783,8 +762,7 @@ class _ShopItemCard extends StatelessWidget {
                         color: cs.onSurface.withOpacity(0.45),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    // ── CHANGE: stock indicator ──────────────────────────────
+                    const SizedBox(height: 1),
                     Text(
                       outOfStock ? 'Out of stock' : 'In stock: $stock',
                       style: TextStyle(
@@ -793,7 +771,7 @@ class _ShopItemCard extends StatelessWidget {
                         color: outOfStock ? Colors.red : SoilColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -806,7 +784,6 @@ class _ShopItemCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                // Dim price when out of stock
                                 color: outOfStock
                                     ? cs.onSurface.withOpacity(0.3)
                                     : accentColor,
@@ -820,7 +797,6 @@ class _ShopItemCard extends StatelessWidget {
                                       color: cs.onSurface.withOpacity(0.38))),
                           ],
                         ),
-                        // ── + button OR −/qty/+ stepper ──────────────────
                         cartQty == 0
                             ? GestureDetector(
                           onTap: outOfStock ? null : onAdd,
@@ -911,7 +887,6 @@ class _GridProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Top row: emoji + badge ───────────────────────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -948,7 +923,6 @@ class _GridProductCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // ── Title ────────────────────────────────────────────────────────
           Text(
             title,
             maxLines: 2,
@@ -962,7 +936,6 @@ class _GridProductCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          // ── Price ────────────────────────────────────────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -992,7 +965,6 @@ class _GridProductCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // ── Add Button ───────────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -1032,8 +1004,8 @@ class _TikTokProductCard extends StatelessWidget {
   final String emoji, title, description;
   final int price, cartQty;
   final String? badge;
+  final String? imagePath;    // kept as-is; this is an optional asset path
   final VoidCallback onAdd;
-  final String? imagePath;
 
   const _TikTokProductCard({
     required this.gradientColors,
@@ -1074,8 +1046,14 @@ class _TikTokProductCard extends StatelessWidget {
             child: Stack(
               children: [
                 Center(
-                  child: imagePath != null
-                      ? Image.asset(imagePath!, fit: BoxFit.contain, height: 100)
+                  // FIX 3: use imagePath (the actual field), not the undefined 'imageUrl'
+                  child: imagePath != null && imagePath!.isNotEmpty
+                      ? Image.asset(
+                    imagePath!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        Text(emoji, style: const TextStyle(fontSize: 64)),
+                  )
                       : Text(emoji, style: const TextStyle(fontSize: 64)),
                 ),
                 if (badge != null)
@@ -1083,7 +1061,8 @@ class _TikTokProductCard extends StatelessWidget {
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.22),
                         borderRadius: BorderRadius.circular(Sr.rPill),
@@ -1103,7 +1082,8 @@ class _TikTokProductCard extends StatelessWidget {
                     top: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.35),
                         borderRadius: BorderRadius.circular(Sr.rPill),
@@ -1170,8 +1150,10 @@ class _TikTokProductCard extends StatelessWidget {
                   icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
                   label: const Text('Add'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -1270,7 +1252,6 @@ class _ProductCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Price
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1445,10 +1426,7 @@ class _CartSheetState extends State<_CartSheet> {
         color: isDark ? SoilColors.surfaceDark : SoilColors.surfaceLight,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(Sr.rXl)),
       ),
-      padding: EdgeInsets.only(
-        bottom: bot + 20,
-        left: 0, right: 0,
-      ),
+      padding: EdgeInsets.only(bottom: bot + 20, left: 0, right: 0),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Center(child: Container(
@@ -1477,7 +1455,6 @@ class _CartSheetState extends State<_CartSheet> {
                       fontSize: 14)),
             )
           else if (!_showCheckout) ...[
-            // ── Cart items ────────────────────────────────────────────────
             ...widget.cart.map((item) => ListTile(
               title: Text(item.label,
                   style: const TextStyle(fontSize: 13.5,
@@ -1534,15 +1511,14 @@ class _CartSheetState extends State<_CartSheet> {
               ),
             ),
           ] else ...[
-            // ── Checkout form ─────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.only(
-                left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20, right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Order summary chip
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -1609,7 +1585,8 @@ class _CartSheetState extends State<_CartSheet> {
                               _addressCtrl.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Please fill in contact and address'),
+                                content: Text(
+                                    'Please fill in contact and address'),
                                 backgroundColor: Colors.red,
                               ),
                             );
@@ -1618,7 +1595,7 @@ class _CartSheetState extends State<_CartSheet> {
 
                           setState(() => _placing = true);
                           final messenger = ScaffoldMessenger.of(context);
-                          final nav = Navigator.of(context);
+                          final nav       = Navigator.of(context);
 
                           try {
                             final items = widget.cart.map((c) => {
@@ -1628,7 +1605,8 @@ class _CartSheetState extends State<_CartSheet> {
                               'price': c.price,
                             }).toList();
 
-                            final orderId = await OrderService.instance.placeOrder(
+                            final orderId =
+                            await OrderService.instance.placeOrder(
                               items, widget.total,
                               contact: _contactCtrl.text.trim(),
                               address: _addressCtrl.text.trim(),
@@ -1637,26 +1615,27 @@ class _CartSheetState extends State<_CartSheet> {
                             messenger.showSnackBar(
                               SnackBar(
                                 content: const Row(children: [
-                                  Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
+                                  Icon(Icons.check_circle_outline,
+                                      color: Colors.white, size: 16),
                                   SizedBox(width: 8),
                                   Text('Order placed successfully!'),
                                 ]),
                                 backgroundColor: SoilColors.primary,
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(Sr.rSm)),
+                                    borderRadius:
+                                    BorderRadius.circular(Sr.rSm)),
                               ),
                             );
 
-                            // ── Navigate first so pop doesn't cancel the email ──
                             nav.pop();
                             widget.onOrderPlaced();
 
-                            // Send email notification to admin — fire & forget
                             final user = FirebaseAuth.instance.currentUser;
                             final customerEmail = user?.email ?? '';
                             final customerName  = user?.displayName
-                                ?? user?.email?.split('@').first ?? 'Customer';
+                                ?? user?.email?.split('@').first
+                                ?? 'Customer';
 
                             await EmailService.notifyAdminNewOrder(
                               orderId:       orderId,
@@ -1679,14 +1658,17 @@ class _CartSheetState extends State<_CartSheet> {
                             );
                           } catch (e) {
                             messenger.showSnackBar(
-                              SnackBar(content: Text('Order failed: $e'), backgroundColor: Colors.red),
+                              SnackBar(
+                                  content: Text('Order failed: $e'),
+                                  backgroundColor: Colors.red),
                             );
                           } finally {
                             if (mounted) setState(() => _placing = false);
                           }
                         },
                         child: _placing
-                            ? const SizedBox(width: 18, height: 18,
+                            ? const SizedBox(
+                            width: 18, height: 18,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
                             : const Text('Place Order'),
