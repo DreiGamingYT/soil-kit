@@ -3,11 +3,12 @@ import '../services/image_analysis_service.dart';
 import '../services/calibration_service.dart';
 import '../services/soil_logic_service.dart';
 import 'dashboard_screen.dart';
+import 'fertilizer_calculator_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   final String imagePath;
 
-  ResultScreen(this.imagePath);
+  const ResultScreen(this.imagePath);
 
   @override
   _ResultScreenState createState() => _ResultScreenState();
@@ -187,6 +188,29 @@ class _ResultScreenState extends State<ResultScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
               ),
+            ),
+
+            SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.calculate_rounded, size: 16),
+              label: const Text('Fertilizer Calculator'),
+              onPressed: () {
+                // Convert "HIGH" → "High" to match calculator's expected format
+                String titleCase(String s) => s.isEmpty
+                    ? s
+                    : s[0].toUpperCase() + s.substring(1).toLowerCase();
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FertilizerCalculatorScreen(
+                      initialN: titleCase(results!['Nitrogen'] ?? 'Low'),
+                      initialP: titleCase(results!['Phosphorus'] ?? 'Low'),
+                      initialK: titleCase(results!['Potassium'] ?? 'Low'),
+                    ),
+                  ),
+                );
+              },
             ),
 
             SizedBox(height: 20),

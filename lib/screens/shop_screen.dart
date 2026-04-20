@@ -111,6 +111,7 @@ class _ShopScreenState extends State<ShopScreen> {
     required String emoji,
     required int price,
     required Color accentColor,
+    required int stock,
   }) {
     showModalBottomSheet(
       context: context,
@@ -119,6 +120,8 @@ class _ShopScreenState extends State<ShopScreen> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) {
           final qty = _cart.where((c) => c.key == key).fold(0, (a, b) => a + b.qty);
+          final outOfStock = stock == 0;
+          final atMax      = qty >= stock && !outOfStock;
           final cs  = Theme.of(ctx).colorScheme;
           return Container(
             decoration: BoxDecoration(
@@ -169,7 +172,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         icon: Icons.add_rounded,
                         color: accentColor,
                         filled: true,
-                        onTap: () { _addCartItem(key, name, price); setS(() {}); },
+                        onTap: outOfStock || atMax ? null : () { _addCartItem(key, name, price); setS(() {}); },
                       ),
                     ]),
                   ]),
@@ -540,6 +543,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     emoji: '🧺',
                     price: 349,
                     accentColor: SoilColors.primary,
+                    stock: _stockMap['test_kit'] ?? 99,
                   ),
                 ),
                 // ── Test Tube ─────────────────────────────────────
@@ -562,6 +566,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     emoji: '🔬',
                     price: 29,
                     accentColor: const Color(0xFF546E7A),
+                    stock: _stockMap['tube_dropper'] ?? 99,
                   ),
                 ),
               ],
@@ -615,6 +620,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     emoji: r.emoji,
                     price: 99,
                     accentColor: r.color,
+                    stock: stock,
                   ),
                 );
               }).toList(),

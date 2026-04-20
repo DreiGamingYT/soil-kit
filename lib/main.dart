@@ -6,6 +6,8 @@ import 'package:soilmate/services/soil_data_service.dart';
 import 'screens/auth_gate.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // If you used FlutterFire CLI, uncomment this:
 import 'firebase_options.dart';

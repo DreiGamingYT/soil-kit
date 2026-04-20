@@ -11,6 +11,7 @@ import 'profile_screen.dart';
 import 'history_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
+import 'fertilizer_calculator_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final int selectedIndex;
@@ -34,6 +35,8 @@ class HomeScreen extends StatelessWidget {
         return const NotesScreen(showBottomNav: false);
       case 5:
         return const HistoryScreen(showBottomNav: false);
+      case 6:
+        return const FertilizerCalculatorScreen();
       default:
         return const _HomeBody();
     }
@@ -52,7 +55,7 @@ class HomeScreen extends StatelessWidget {
           onDashboardTap: () => onNavTap(5),
         ),
 
-        floatingActionButton: selectedIndex == 3
+        floatingActionButton: selectedIndex == 3 || selectedIndex == 6
             ? null
             : _DashboardFab(
           isSelected: selectedIndex == 5,
