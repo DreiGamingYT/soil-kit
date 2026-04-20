@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../models/soil_result.dart';
 import '../services/soil_data_service.dart';
@@ -38,12 +39,12 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   // Each tab has its own PageController; page 500 = current period
   static const int _midPage = 500;
-  final _pageCtrl = List.generate(4, (_) => PageController(initialPage: _midPage));
+  final _pageCtrl = List.generate(_Period.values.length, (_) => PageController(initialPage: _midPage));
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -171,9 +172,10 @@ class _HistoryScreenState extends State<HistoryScreen>
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
               ),
-              tabs: _Period.values
-                  .map((p) => Tab(text: p.label))
-                  .toList(),
+              tabs: [
+                ..._Period.values.map((p) => Tab(text: p.label)),
+                const Tab(text: 'Trends'),
+              ],
             ),
           ),
         ),
@@ -181,32 +183,36 @@ class _HistoryScreenState extends State<HistoryScreen>
       body: TabBarView(
         controller: _tabCtrl,
         physics: const NeverScrollableScrollPhysics(),
-        children: _Period.values.asMap().entries.map((e) {
-          final tabIdx = e.key;
-          final period = e.value;
-          return PageView.builder(
-            controller: _pageCtrl[tabIdx],
-            itemBuilder: (_, page) {
-              final offset = _midPage - page;
-              if (offset < 0) {
-                // Future — redirect to current immediately
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_pageCtrl[tabIdx].hasClients) {
-                    _pageCtrl[tabIdx].jumpToPage(_midPage);
-                  }
-                });
-              }
-              final results = _getResults(period, page);
-              final title   = _periodTitle(period, page);
-              return _PeriodPage(
-                period: period,
-                title: title,
-                results: results,
-                offset: offset < 0 ? 0 : offset,
-              );
-            },
-          );
-        }).toList(),
+        children: [
+          ..._Period.values.asMap().entries.map((e) {
+            final tabIdx = e.key;
+            final period = e.value;
+            return PageView.builder(
+              controller: _pageCtrl[tabIdx],
+              itemBuilder: (_, page) {
+                final offset = _midPage - page;
+                if (offset < 0) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_pageCtrl[tabIdx].hasClients) {
+                      _pageCtrl[tabIdx].jumpToPage(_midPage);
+                    }
+                  });
+                }
+                final results = _getResults(period, page);
+                final title   = _periodTitle(period, page);
+                return _PeriodPage(
+                  period: period,
+                  title: title,
+                  results: results,
+                  offset: offset < 0 ? 0 : offset,
+                );
+              },
+            );
+          }).toList(),
+
+          // ✅ ADD THIS AS LAST ITEM (6th tab)
+          _TrendsTab(),
+        ],
       ),
       bottomNavigationBar: widget.showBottomNav
           ? AppBottomNav(
@@ -853,6 +859,41 @@ class _EmptyPeriod extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TrendsTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final results = SoilDataService.instance.results;
+    if (results.length < 2) {
+      return const Center(child: Text('Scan at least 2 times to see trends.'));
+    }
+    // Sort oldest → newest
+    final sorted = [...results]..sort((a, b) => a.date.compareTo(b.date));
+
+    int _npkScore(SoilResult r, String nutrient) {
+      final val = nutrient == 'N' ? r.nitrogenLevel
+          : nutrient == 'P' ? r.phosphorusLevel : r.potassiumLevel;
+      return val == 'High' ? 3 : val == 'Medium' ? 2 : 1;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LineChart(LineChartData(
+        titlesData: FlTitlesData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: sorted.asMap().entries.map((e) =>
+                FlSpot(e.key.toDouble(), e.value.overallScore)).toList(),
+            isCurved: true,
+            color: SoilColors.primary,
+            barWidth: 2,
+            dotData: FlDotData(show: true),
+          ),
+        ],
+      )),
     );
   }
 }

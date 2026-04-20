@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:soilmate/services/soil_data_service.dart';
 import 'screens/auth_gate.dart';
 import 'services/settings_service.dart';
 import 'services/notification_service.dart';
@@ -19,6 +20,8 @@ Future<void> main() async {
   );
 
   NotificationService.instance.init();
+
+  await SoilDataService.instance.loadFromLocal();
 
   runApp(const SoilApp());
 }

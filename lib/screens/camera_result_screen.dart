@@ -5,6 +5,8 @@ import '../models/soil_result.dart';
 import '../services/soil_data_service.dart';
 import '../services/settings_service.dart';
 import '../main.dart';
+import '../services/crop_recommendation_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CameraResultScreen extends StatelessWidget {
   final SoilResult result;
@@ -29,19 +31,15 @@ class CameraResultScreen extends StatelessWidget {
     'Jul','Aug','Sep','Oct','Nov','Dec'
   ];
 
-  void _save(BuildContext context) {
-    final s = SettingsService.instance;
-    SoilDataService.instance.addResult(result);
+  Future<void> _save(BuildContext context) async {
+    final conn = await Connectivity().checkConnectivity();
+    final isOnline = conn != ConnectivityResult.none;
+
+    SoilDataService.instance.addResult(result, saveToFirestore: isOnline);
+    // show appropriate snack
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 16),
-        const SizedBox(width: 8),
-        Text(s.tr('saved')),
-      ]),
+      content: Text(isOnline ? 'Saved!' : 'Saved offline — will sync when online'),
       backgroundColor: SoilColors.primary,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 2),
     ));
     Navigator.popUntil(context, (r) => r.isFirst);
   }
@@ -332,6 +330,13 @@ class CameraResultScreen extends StatelessWidget {
                 _RecommendationsSection(result: result, s: s),
                 const SizedBox(height: 16),
 
+                // ── Crop Recommendations ─────────────────────────────────────
+                _CropRecommendSection(result: result),
+                const SizedBox(height: 16),
+
+                _DosageCalculator(result: result),
+                const SizedBox(height: 16),
+
                 // ── Actions ─────────────────────────────────────────
                 Row(children: [
                   Expanded(child: OutlinedButton(
@@ -350,6 +355,41 @@ class CameraResultScreen extends StatelessWidget {
           ]),
         ),
       ),
+    );
+  }
+}
+
+class _CropRecommendSection extends StatelessWidget {
+  final SoilResult result;
+  const _CropRecommendSection({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final crops = CropRecommendationService.recommend(
+      result.nitrogenLevel, result.phosphorusLevel,
+      result.potassiumLevel, result.ph, result.soilType,
+    );
+    final cs = Theme.of(context).colorScheme;
+    if (crops.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(Sr.rXl),
+        border: Border.all(color: cs.outline),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Recommended Crops', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: cs.onSurface)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: crops.map((c) => Chip(
+            label: Text(c, style: const TextStyle(fontSize: 12)),
+            backgroundColor: SoilColors.primaryLight,
+          )).toList(),
+        ),
+      ]),
     );
   }
 }
@@ -656,4 +696,67 @@ class _NestedDonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_) => false;
+}
+
+class _DosageCalculator extends StatefulWidget {
+  final SoilResult result;
+  const _DosageCalculator({required this.result});
+  @override
+  State<_DosageCalculator> createState() => _DosageCalculatorState();
+}
+
+class _DosageCalculatorState extends State<_DosageCalculator> {
+  final _ctrl = TextEditingController(text: '500');
+
+  double get _area => double.tryParse(_ctrl.text) ?? 500;
+
+  // kg/ha rates — simplified standard values
+  String _dose(String level, double baseKgHa) {
+    final mult = level == 'Low' ? 1.0 : level == 'Medium' ? 0.5 : 0.0;
+    final kg = (baseKgHa * mult * _area / 10000);
+    return kg == 0 ? 'Not needed' : '${kg.toStringAsFixed(1)} kg';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final r = widget.result;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(Sr.rXl),
+        border: Border.all(color: cs.outline),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Dosage Calculator', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Plot size (m²)', isDense: true),
+            onChanged: (_) => setState(() {}),
+          )),
+        ]),
+        const SizedBox(height: 12),
+        _DoseRow('Urea (N)',        _dose(r.nitrogenLevel,   200)),
+        _DoseRow('Superphosphate (P)', _dose(r.phosphorusLevel, 150)),
+        _DoseRow('Muriate of Potash (K)', _dose(r.potassiumLevel, 100)),
+      ]),
+    );
+  }
+}
+
+class _DoseRow extends StatelessWidget {
+  final String label, value;
+  const _DoseRow(this.label, this.value);
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(label, style: const TextStyle(fontSize: 13)),
+      Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }

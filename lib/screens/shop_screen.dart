@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
@@ -43,6 +44,24 @@ class _ShopScreenState extends State<ShopScreen> {
 
   int get _cartCount => _cart.fold(0, (a, b) => a + b.qty);
   int get _cartTotal => _cart.fold(0, (a, b) => a + b.price * b.qty);
+
+  // Add field:
+  Map<String, int> _stockMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _listenStock();
+  }
+
+  void _listenStock() {
+    FirebaseFirestore.instance.collection('products').snapshots().listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _stockMap = { for (final d in snap.docs) d.id: (d['stock'] as num?)?.toInt() ?? 0 };
+      });
+    });
+  }
 
   void _addCartItem(String key, String label, int price) {
     setState(() {
@@ -508,6 +527,8 @@ class _ShopScreenState extends State<ShopScreen> {
                   subtitle: 'Complete kit with all reagents & tools',
                   price: 349,
                   accentColor: SoilColors.primary,
+                  // Non-reagent products default to always available (no Firestore stock doc)
+                  stock: _stockMap['test_kit'] ?? 99,
                   cartQty: _cart.where((c) => c.key == 'test_kit').fold(0, (a, b) => a + b.qty),
                   onAdd: () => _addCartItem('test_kit', '1 Set Test Kit', 349),
                   onRemove: () => _removeCartItem('test_kit'),
@@ -529,6 +550,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   subtitle: 'Borosilicate glass + precision dropper',
                   price: 29,
                   accentColor: const Color(0xFF546E7A),
+                  stock: _stockMap['tube_dropper'] ?? 99,
                   cartQty: _cart.where((c) => c.key == 'tube_dropper').fold(0, (a, b) => a + b.qty),
                   onAdd: () => _addCartItem('tube_dropper', 'Test Tubes & Droplets', 29),
                   onRemove: () => _removeCartItem('tube_dropper'),
@@ -571,7 +593,9 @@ class _ShopScreenState extends State<ShopScreen> {
               mainAxisSpacing: 12,
               childAspectRatio: 0.72,
               children: _reagents.map((r) {
-                final qty = _cart.where((c) => c.key == r.key).fold(0, (a, b) => a + b.qty);
+                final qty   = _cart.where((c) => c.key == r.key).fold(0, (a, b) => a + b.qty);
+                // ── CHANGE: read live stock for this reagent ──────────────────
+                final stock = _stockMap[r.key] ?? 0;
                 return _ShopItemCard(
                   imagePath: 'assets/images/${r.key}.png',
                   emoji: r.emoji,
@@ -579,6 +603,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   subtitle: r.subtitle,
                   price: 99,
                   accentColor: r.color,
+                  stock: stock,
                   cartQty: qty,
                   onAdd: () => _addCartItem(r.key, '${r.name} Reagent', 99),
                   onRemove: () => _removeCartItem(r.key),
@@ -666,7 +691,7 @@ class _QtyButton extends StatelessWidget {
 // ── Shop Item Card (2-column grid) ────────────────────────────────────────────
 class _ShopItemCard extends StatelessWidget {
   final String imagePath, emoji, name, subtitle;
-  final int price, cartQty;
+  final int price, cartQty, stock;   // ← stock added
   final Color accentColor;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
@@ -680,6 +705,7 @@ class _ShopItemCard extends StatelessWidget {
     required this.price,
     required this.accentColor,
     required this.cartQty,
+    required this.stock,              // ← stock added
     required this.onAdd,
     required this.onRemove,
     required this.onTap,
@@ -687,7 +713,9 @@ class _ShopItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs        = Theme.of(context).colorScheme;
+    final outOfStock = stock == 0;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -705,12 +733,18 @@ class _ShopItemCard extends StatelessWidget {
               flex: 5,
               child: Container(
                 width: double.infinity,
-                color: accentColor.withOpacity(0.1),
+                color: accentColor.withOpacity(outOfStock ? 0.05 : 0.1),
                 child: Image.asset(
                   imagePath,
                   fit: BoxFit.contain,
+                  // Dim image when out of stock
+                  color: outOfStock ? Colors.white.withOpacity(0.4) : null,
+                  colorBlendMode: outOfStock ? BlendMode.modulate : null,
                   errorBuilder: (_, __, ___) => Center(
-                    child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                    child: Opacity(
+                      opacity: outOfStock ? 0.4 : 1.0,
+                      child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                    ),
                   ),
                 ),
               ),
@@ -743,6 +777,16 @@ class _ShopItemCard extends StatelessWidget {
                         color: cs.onSurface.withOpacity(0.45),
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    // ── CHANGE: stock indicator ──────────────────────────────
+                    Text(
+                      outOfStock ? 'Out of stock' : 'In stock: $stock',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: outOfStock ? Colors.red : SoilColors.primary,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -756,7 +800,10 @@ class _ShopItemCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                color: accentColor,
+                                // Dim price when out of stock
+                                color: outOfStock
+                                    ? cs.onSurface.withOpacity(0.3)
+                                    : accentColor,
                                 letterSpacing: -0.3,
                               ),
                             ),
@@ -770,16 +817,23 @@ class _ShopItemCard extends StatelessWidget {
                         // ── + button OR −/qty/+ stepper ──────────────────
                         cartQty == 0
                             ? GestureDetector(
-                          onTap: onAdd,
+                          onTap: outOfStock ? null : onAdd,
                           child: Container(
                             width: 30,
                             height: 30,
                             decoration: BoxDecoration(
-                              color: accentColor,
+                              color: outOfStock
+                                  ? cs.onSurface.withOpacity(0.12)
+                                  : accentColor,
                               borderRadius: BorderRadius.circular(Sr.rMd),
                             ),
-                            child: const Icon(Icons.add_rounded,
-                                color: Colors.white, size: 18),
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: outOfStock
+                                  ? cs.onSurface.withOpacity(0.3)
+                                  : Colors.white,
+                              size: 18,
+                            ),
                           ),
                         )
                             : Row(mainAxisSize: MainAxisSize.min, children: [
@@ -800,7 +854,7 @@ class _ShopItemCard extends StatelessWidget {
                             icon: Icons.add_rounded,
                             color: accentColor,
                             filled: true,
-                            onTap: onAdd,
+                            onTap: cartQty >= stock ? null : onAdd,
                           ),
                         ]),
                       ],

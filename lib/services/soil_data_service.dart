@@ -1,7 +1,11 @@
 import '../models/soil_result.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// Simple in-memory singleton that keeps results & notes alive across screens.
 class SoilDataService {
+  final List<SoilResult> _pendingSync = [];
+  bool get hasPendingSync => _pendingSync.isNotEmpty;
   SoilDataService._();
   static final SoilDataService instance = SoilDataService._();
 
@@ -63,7 +67,48 @@ class SoilDataService {
     },
   ];
 
-  void addResult(SoilResult r) => results.insert(0, r);
+  Future<void> addResult(SoilResult r, {bool saveToFirestore = true}) async {
+    results.insert(0, r);
+    final prefs = await SharedPreferences.getInstance();
+    // persist locally (simple JSON list of scores for now)
+    final encoded = results.map((s) => jsonEncode({
+      'soilType': s.soilType,
+      'date': s.date.toIso8601String(),
+      'overallScore': s.overallScore,
+      'status': s.status,
+      'nitrogenLevel': s.nitrogenLevel,
+      'phosphorusLevel': s.phosphorusLevel,
+      'potassiumLevel': s.potassiumLevel,
+      'ph': s.ph,
+      'imagePath': s.imagePath,
+    })).toList();
+    await prefs.setStringList('soil_results', encoded);
+
+    if (!saveToFirestore) _pendingSync.add(r);
+  }
+
+// Add a new method after addResult:
+  Future<void> loadFromLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList('soil_results') ?? [];
+    results
+      ..clear()
+      ..addAll(raw.map((e) {
+        final m = jsonDecode(e) as Map<String, dynamic>;
+        return SoilResult(
+          soilType: m['soilType'],
+          date: DateTime.parse(m['date']),
+          overallScore: (m['overallScore'] as num).toDouble(),
+          status: m['status'],
+          nitrogenLevel: m['nitrogenLevel'],
+          phosphorusLevel: m['phosphorusLevel'],
+          potassiumLevel: m['potassiumLevel'],
+          ph: (m['ph'] as num).toDouble(),
+          imagePath: m['imagePath'],
+        );
+      }));
+  }
+
   void removeResult(int i) => results.removeAt(i);
 
   void addNote(Map<String, String> note) => notes.insert(0, note);
