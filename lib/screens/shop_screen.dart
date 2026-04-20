@@ -14,13 +14,13 @@ class _Reagent {
   const _Reagent(this.name, this.subtitle, this.emoji, this.key, this.color);
 }
 
-const _reagents = [
+/*const _reagents = [
   _Reagent('Nitrogen (N)',     'Measures available nitrogen',      '🟦', 'reagent_n',  Color(0xFF1976D2)),
   _Reagent('Phosphorus (P)',   'Detects phosphate concentration',  '🟧', 'reagent_p',  Color(0xFFF57C00)),
   _Reagent('Potassium (K)',    'Tests potassium (potash) levels',  '🟪', 'reagent_k',  Color(0xFF7B1FA2)),
   _Reagent('pH Indicator',    'Measures soil acidity/alkalinity', '🟩', 'reagent_ph', Color(0xFF388E3C)),
   _Reagent('Ammonium Nitrate','Nitrogen fertilizer supplement',   '🟫', 'reagent_an', Color(0xFF5D4037)),
-];
+];*/
 
 // ── Cart item ─────────────────────────────────────────────────────────────────
 class _CartItem {
