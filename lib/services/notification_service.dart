@@ -127,12 +127,14 @@ class NotificationService {
   // ── Helpers ───────────────────────────────────────────────────────────────
   String _statusLabel(String status) {
     switch (status) {
-      case 'confirmed':  return 'Confirmed ✅';
-      case 'preparing':  return 'Being Prepared ⏳';
-      case 'shipped':    return 'Out for Delivery 🚚';
-      case 'delivered':  return 'Delivered 📦';
-      case 'cancelled':  return 'Cancelled ❌';
-      default:           return status;
+      case 'confirmed':       return 'Confirmed ✅';
+      case 'preparing':       return 'Being Prepared ⏳';
+      case 'shipped':         return 'Out for Delivery 🚚';
+      case 'delivered':       return 'Delivered 📦';
+      case 'cancelled':       return 'Cancelled ❌';
+      case 'returnRequested': return 'Return Requested 🔄';
+      case 'refunded':        return 'Refunded 💸';
+      default:                return status;
     }
   }
 

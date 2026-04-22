@@ -28,8 +28,18 @@ class OrderService {
           ?? _auth.currentUser?.email?.split('@').first ?? '',
       'customerEmail': _auth.currentUser?.email ?? '',
       'createdAt':     FieldValue.serverTimestamp(),
-      'adminNote':     '',
+      'note':          '',
     });
+
+    final batch = _db.batch();
+    for (final item in items) {
+      final productId = item['key'] as String? ?? '';
+      final qty       = (item['qty'] as num?)?.toInt() ?? 1;
+      if (productId.isEmpty) continue;
+      final ref = _db.collection('products').doc(productId);
+      batch.update(ref, {'stock': FieldValue.increment(-qty)});
+    }
+    await batch.commit();
 
     return ref.id;
   }
@@ -39,6 +49,7 @@ class OrderService {
     return _db
         .collection('orders')
         .where('uid', isEqualTo: uid)
+        .where('trashed', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }

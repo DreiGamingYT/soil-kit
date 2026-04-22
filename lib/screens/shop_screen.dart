@@ -6,6 +6,7 @@ import '../services/order_service.dart';
 import '../services/email_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'my_orders_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // ── Reagent data ──────────────────────────────────────────────────────────────
 class _Reagent {
@@ -154,13 +155,25 @@ class _ShopScreenState extends State<ShopScreen> {
                 color: accentColor.withOpacity(0.1),
                 // FIX 5: use Image.network instead of Image.asset
                 child: imageUrl.isNotEmpty
-                    ? Image.network(
-                  imageUrl,
+                    ? CachedNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      Center(child: Text(emoji, style: const TextStyle(fontSize: 72))),
+                  placeholder: (_, __) => const Center(
+                    child: SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Center(
+                    child: Opacity(
+                      opacity: outOfStock ? 0.4 : 1.0,
+                      child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                    ),
+                  ),
                 )
-                    : Center(child: Text(emoji, style: const TextStyle(fontSize: 72))),
+                    : Center(
+                  child: Text(emoji, style: const TextStyle(fontSize: 40)),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -489,6 +502,14 @@ class _ShopScreenState extends State<ShopScreen> {
                           statusColor = Colors.red;
                           icon = Icons.cancel_rounded;
                           break;
+                        case 'returnRequested':
+                          statusColor = Colors.deepOrange;
+                          icon = Icons.assignment_return_rounded;
+                          break;
+                        case 'refunded':
+                          statusColor = Colors.teal;
+                          icon = Icons.currency_exchange_rounded;
+                          break;
                         default:
                           statusColor = SoilColors.clay;
                           icon = Icons.schedule_rounded;
@@ -715,15 +736,25 @@ class _ShopItemCard extends StatelessWidget {
                 child: imageUrl.isNotEmpty
                     ? Opacity(
                   opacity: outOfStock ? 0.4 : 1.0,
-                  child: Image.network(
-                    imageUrl,
+                  child: imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                    imageUrl: imageUrl,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Center(
+                    placeholder: (_, __) => const Center(
+                      child: SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => Center(
                       child: Opacity(
                         opacity: outOfStock ? 0.4 : 1.0,
                         child: Text(emoji, style: const TextStyle(fontSize: 40)),
                       ),
                     ),
+                  )
+                      : Center(
+                    child: Text(emoji, style: const TextStyle(fontSize: 40)),
                   ),
                 )
                     : Center(

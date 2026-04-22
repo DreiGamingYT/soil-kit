@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/order_service.dart';
+import 'chat_screen.dart';
 
 class MyOrdersScreen extends StatelessWidget {
   const MyOrdersScreen({super.key});
@@ -198,6 +199,7 @@ class _OrderDetailSheet extends StatelessWidget {
         ? DateFormat('MMMM d, yyyy • h:mm a').format(ts.toDate()) : 'Processing...';
     final address = data['address'] ?? '';
     final contact = data['contact'] ?? '';
+    final note    = data['note']    as String? ?? '';
     final shortId = orderId.substring(0, 8).toUpperCase();
     final (_, col, _) = _statusInfo(status);
 
@@ -208,8 +210,14 @@ class _OrderDetailSheet extends StatelessWidget {
       (l: 'Shipped',   i: Icons.local_shipping_rounded),
       (l: 'Delivered', i: Icons.check_circle_rounded),
       (l: 'Cancelled', i: Icons.cancel_rounded),
+      (l: 'Return',    i: Icons.assignment_return_rounded),
+      (l: 'Refunded',  i: Icons.currency_exchange_rounded),
     ];
-    const statusKeys = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
+    const statusKeys = [
+      'pending', 'confirmed', 'preparing', 'shipped',
+      'delivered', 'cancelled',
+      'returnRequested', 'refunded',
+    ];
     final curStep = statusKeys.indexOf(status);
 
     return Container(
@@ -394,6 +402,45 @@ class _OrderDetailSheet extends StatelessWidget {
                   ]),
                 ),
               ],
+
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                  label: const Text('Messages'),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OrderChatScreen(orderId: orderId),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Admin note
+              if (note.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _label('Note from Admin'),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: SoilColors.harvest.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(Sr.rLg),
+                    border: Border.all(color: SoilColors.harvest.withOpacity(0.25)),
+                  ),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.info_outline_rounded, size: 16, color: SoilColors.harvest),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(note, style: TextStyle(
+                      fontSize: 13, height: 1.5,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75),
+                    ))),
+                  ]),
+                ),
+              ],
               const SizedBox(height: 20),
             ]),
           ),
@@ -430,11 +477,13 @@ class _InfoRow extends StatelessWidget {
 
 (String, Color, IconData) _statusInfo(String s) {
   switch (s) {
-    case 'confirmed':  return ('Confirmed',   Colors.blue,   Icons.verified_rounded);
-    case 'preparing':  return ('Preparing',   Colors.purple, Icons.hourglass_bottom_rounded);
-    case 'shipped':    return ('Shipped',     Colors.orange, Icons.local_shipping_rounded);
-    case 'delivered':  return ('Delivered',   Colors.green,  Icons.check_circle_rounded);
-    case 'cancelled':  return ('Cancelled',   Colors.red,    Icons.cancel_rounded);
-    default:           return ('Pending',     SoilColors.clay, Icons.schedule_rounded);
+    case 'confirmed':        return ('Confirmed',        Colors.blue,   Icons.verified_rounded);
+    case 'preparing':        return ('Preparing',        Colors.purple, Icons.hourglass_bottom_rounded);
+    case 'shipped':          return ('Shipped',          Colors.orange, Icons.local_shipping_rounded);
+    case 'delivered':        return ('Delivered',        Colors.green,  Icons.check_circle_rounded);
+    case 'cancelled':        return ('Cancelled',        Colors.red,    Icons.cancel_rounded);
+    case 'returnRequested':  return ('Return Requested', Colors.deepOrange, Icons.assignment_return_rounded);
+    case 'refunded':         return ('Refunded',         Colors.teal,   Icons.currency_exchange_rounded);
+    default:                 return ('Pending',          SoilColors.clay, Icons.schedule_rounded);
   }
 }
