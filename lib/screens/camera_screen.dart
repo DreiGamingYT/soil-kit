@@ -12,19 +12,11 @@ import '../services/calibration_service.dart';
 import '../services/image_analysis_service.dart';
 import '../services/soil_logic_service.dart';
 import 'camera_result_screen.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Enums
-// ─────────────────────────────────────────────────────────────────────────────
+import 'calibration_screen.dart';
 
 enum _DetectState { scanning, soilFound, noSoil }
 
-/// Live capture quality issues reported in real-time (Feature 5).
 enum _QualityIssue { none, tooDark, tooBright, blurry }
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  CameraScreen
-// ─────────────────────────────────────────────────────────────────────────────
 
 class CameraScreen extends StatefulWidget {
   final String? initialImagePath;
@@ -523,21 +515,51 @@ class _CameraScreenState extends State<CameraScreen>
 
       String nitrogenLevel, phosphorusLevel, potassiumLevel;
       double ph;
+      bool isHeuristic = false;
 
-      if (calibrationRaw != null && calibrationRaw.isNotEmpty) {
-        _setStatus('Matching nutrient levels…');
-        nitrogenLevel   = _matchNutrient(sampleRGB, calibrationRaw, 'Nitrogen');
-        phosphorusLevel = _matchNutrient(sampleRGB, calibrationRaw, 'Phosphorus');
-        potassiumLevel  = _matchNutrient(sampleRGB, calibrationRaw, 'Potassium');
-        ph              = _matchPh(sampleRGB, calibrationRaw);
-      } else {
-        _setStatus('No calibration found — using heuristic…');
-        final result = _heuristicEstimate(sampleRGB);
-        nitrogenLevel   = result['n']!;
-        phosphorusLevel = result['p']!;
-        potassiumLevel  = result['k']!;
-        ph              = double.parse(result['ph']!);
+      if (calibrationRaw == null || calibrationRaw.isEmpty) {
+        if (!mounted) return;
+        setState(() => _isAnalyzing = false);
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(Icons.science_outlined,
+                color: Color(0xFFD68910), size: 32),
+            title: const Text('Calibration required'),
+            content: const Text(
+              'No calibration data was found. Without it, nutrient and pH '
+                  'readings cannot be determined accurately.\n\n'
+                  'Please calibrate the app with your soil test kit reference '
+                  'colours before analysing a sample.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => CalibrationScreen()),
+                  );
+                },
+                child: const Text('Go to Calibration'),
+              ),
+            ],
+          ),
+        );
+        return;
       }
+
+      _setStatus('Matching nutrient levels…');
+      nitrogenLevel   = _matchNutrient(sampleRGB, calibrationRaw, 'Nitrogen');
+      phosphorusLevel = _matchNutrient(sampleRGB, calibrationRaw, 'Phosphorus');
+      potassiumLevel  = _matchNutrient(sampleRGB, calibrationRaw, 'Potassium');
+      ph              = _matchPh(sampleRGB, calibrationRaw);
 
       // Step 3: pH-weighted score (Feature 4)
       // Range 4–12 (NPK 3–9 + pH 1–3) → normalised to 0–100 %
@@ -562,6 +584,7 @@ class _CameraScreenState extends State<CameraScreen>
         potassiumLevel:  potassiumLevel,
         ph:              double.parse(ph.toStringAsFixed(1)),
         imagePath:       file.path,
+        isHeuristic:     isHeuristic,   // ← passed through to result screen
       );
 
       if (!mounted) return;
@@ -625,43 +648,12 @@ class _CameraScreenState extends State<CameraScreen>
       final matched = _imgService.matchLevel(sampleRGB, levels, threshold: 80);
       switch (matched.toUpperCase()) {
         case 'LOW':    return 5.0;
-        case 'MEDIUM': return 6.5;
-        case 'HIGH':   return 8.0;
-        default:       return 6.5;
+        case 'MEDIUM': return 6.2;
+        case 'HIGH':   return 7.5;
+        default:       return 6.2;
       }
     }
-    return _phFromRgb(sampleRGB[0], sampleRGB[1], sampleRGB[2]);
-  }
-
-  double _phFromRgb(double r, double g, double b) {
-    final rf = r / 255, gf = g / 255, bf = b / 255;
-    final maxC = [rf, gf, bf].reduce(math.max);
-    final minC = [rf, gf, bf].reduce(math.min);
-    final delta = maxC - minC;
-    double h = 0;
-    if (delta > 0) {
-      if (maxC == rf)      h = 60 * (((gf - bf) / delta) % 6);
-      else if (maxC == gf) h = 60 * (((bf - rf) / delta) + 2);
-      else                 h = 60 * (((rf - gf) / delta) + 4);
-      if (h < 0) h += 360;
-    }
-    if (h < 30 || h > 330)        return 4.5 + (h / 30).clamp(0, 1.5);
-    if (h >= 30 && h <= 120)       return 6.0 + ((h - 30) / 90) * 1.5;
-    if (h > 120 && h <= 240)       return 7.0 + ((h - 120) / 120) * 1.0;
-    return 7.5;
-  }
-
-  Map<String, String> _heuristicEstimate(List<double> rgb) {
-    final r = rgb[0], g = rgb[1], b = rgb[2];
-    final total = r + g + b;
-    final rN = total > 0 ? r / total : 0.33;
-    final gN = total > 0 ? g / total : 0.33;
-    final n = gN > 0.38 ? 'High' : gN > 0.30 ? 'Medium' : 'Low';
-    final p = rN < 0.30 ? 'High' : rN < 0.38 ? 'Medium' : 'Low';
-    final brightness = total / (3 * 255);
-    final k = brightness > 0.60 ? 'High' : brightness > 0.35 ? 'Medium' : 'Low';
-    final ph = _phFromRgb(r, g, b);
-    return {'n': n, 'p': p, 'k': k, 'ph': ph.toStringAsFixed(1)};
+    return 6.2;
   }
 
   String _inferSoilType(String n, String p, String k, double ph) =>

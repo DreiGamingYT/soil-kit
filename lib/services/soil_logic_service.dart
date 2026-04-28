@@ -1,8 +1,8 @@
 class SoilLogicService {
 
   int phScore(double ph) {
-    if (ph >= 6.0 && ph <= 7.0) return 3;
-    if ((ph >= 5.5 && ph < 6.0) || (ph > 7.0 && ph <= 7.5)) return 2;
+    if (ph >= 6.0 && ph <= 7.5) return 3;
+    if ((ph >= 5.5 && ph < 6.0) || (ph > 7.5 && ph <= 8.0)) return 2;
     return 1;
   }
 
@@ -33,7 +33,6 @@ class SoilLogicService {
     const profiles = <Map<String, dynamic>>[
       {
         'type': 'Clay Soil',
-        // Clay binds nutrients tightly → medium-to-high NPK retention
         'n': ['Medium', 'High'],
         'p': ['Medium', 'High'],
         'k': ['Medium', 'High'],
@@ -41,7 +40,6 @@ class SoilLogicService {
       },
       {
         'type': 'Sandy Soil',
-        // Fast drainage leaches nutrients → characteristically low
         'n': ['Low'],
         'p': ['Low'],
         'k': ['Low', 'Medium'],
@@ -49,7 +47,6 @@ class SoilLogicService {
       },
       {
         'type': 'Silty Soil',
-        // Fertile, moderate drainage → medium-to-high N, medium P & K
         'n': ['Medium', 'High'],
         'p': ['Medium'],
         'k': ['Medium'],
@@ -57,23 +54,20 @@ class SoilLogicService {
       },
       {
         'type': 'Loamy Soil',
-        // The "ideal" type — balanced across all nutrients
         'n': ['Medium', 'High'],
         'p': ['Medium', 'High'],
         'k': ['Medium', 'High'],
         'phMin': 6.0, 'phMax': 7.0, 'phIdeal': 6.5,
       },
       {
-        'type': 'Peaty Soil',
-        // High organic matter → high N, but very acidic limits P & K uptake
+        'type': 'Organic (High-OM) Soil',
         'n': ['High'],
         'p': ['Low', 'Medium'],
         'k': ['Low', 'Medium'],
         'phMin': 3.5, 'phMax': 6.0, 'phIdeal': 4.5,
       },
       {
-        'type': 'Chalky Soil',
-        // Alkaline and stony → limits micro-nutrient availability, moderate NPK
+        'type': 'Calcareous (Alkaline) Soil',
         'n': ['Low', 'Medium'],
         'p': ['Low', 'Medium'],
         'k': ['Medium'],
@@ -82,7 +76,7 @@ class SoilLogicService {
     ];
 
     double bestScore = -1;
-    String bestType  = 'Mixed Soil';
+    String bestType  = 'Mixed/Unclassified Soil';
 
     for (final profile in profiles) {
       double s = 0;
@@ -132,7 +126,7 @@ class SoilLogicService {
     if (ph < 5.5) {
       rec.add('⚠️ Strongly acidic (pH ${ph.toStringAsFixed(1)}): Apply dolomite at 1–2 t/ha to correct acidity before fertilizing.');
     } else if (ph < 6.0) {
-      rec.add('Slightly acidic (pH ${ph.toStringAsFixed(1)}): Apply dolomite at 0.5–1 t/ha to raise pH toward the optimal range (6.0–7.0).');
+      rec.add('Slightly acidic (pH ${ph.toStringAsFixed(1)}): Apply dolomite at 0.5–1 t/ha to raise pH toward the optimal range (6.0–7.5).');
     } else if (ph > 7.5) {
       rec.add('⚠️ Alkaline soil (pH ${ph.toStringAsFixed(1)}): Avoid basic fertilizers. Apply elemental sulfur or acidifying amendments to lower pH.');
     }
@@ -156,7 +150,12 @@ class SoilLogicService {
       rec.add('Potassium MEDIUM: Light MOP or organic potassium supplementation recommended.');
     }
 
-    // ── All balanced ──────────────────────────────────────────────────────────
+    if (ph >= 6.0) {
+      rec.add('Zinc advisory: Apply Zinc Sulfate (ZnSO₄) at 1–2 kg/ha as basal. '
+          'Zn availability decreases above pH 6.0 and deficiency is common in '
+          'Philippine paddy and corn soils (BSWM ABFS recommendation).');
+    }
+
     if (rec.isEmpty) {
       rec.add('Soil NPK and pH are well-balanced. Maintain with regular organic matter (compost or vermicast) every cropping season.');
     }

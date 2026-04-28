@@ -9,6 +9,11 @@ class SoilResult {
   final double ph;
   final String? imagePath;
 
+  /// True when NPK and pH were estimated via the RGB heuristic fallback
+  /// (i.e. no calibration data was present at analysis time).
+  /// Results in this state are unreliable and must be clearly flagged to the user.
+  final bool isHeuristic;
+
   SoilResult({
     required this.soilType,
     required this.date,
@@ -19,14 +24,16 @@ class SoilResult {
     required this.potassiumLevel,
     required this.ph,
     this.imagePath,
+    this.isHeuristic = false,
   });
 
   String get phDescription {
     if (ph < 4.5)  return 'Strongly Acid';
     if (ph <= 5.0) return 'Extremely Acid';
     if (ph <= 5.5) return 'Very Strongly Acid';
-    if (ph <= 6.8) return 'Moderately to Slightly Acid';
-    return 'Nearly Neutral to Alkaline';
+    if (ph <= 6.5) return 'Moderately to Slightly Acid';
+    if (ph <= 7.5) return 'Near Neutral';
+    return 'Alkaline';
   }
 
   // Crop suitability rating per BSWM (for UI badges / colour coding)
@@ -34,10 +41,10 @@ class SoilResult {
     if (ph < 4.5)  return 'Low';
     if (ph <= 5.0) return 'Moderately Low';
     if (ph <= 5.5) return 'Moderately High';
-    if (ph <= 6.8) return 'High';
+    if (ph <= 7.5) return 'High';
     return 'Low';
   }
 
   // True only when pH is in BSWM's optimal range
-  bool get phIsOptimal => ph >= 5.6 && ph <= 6.8;
+  bool get phIsOptimal => ph >= 5.6 && ph <= 7.5;
 }

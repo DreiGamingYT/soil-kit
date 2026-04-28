@@ -111,22 +111,24 @@ class FertRightService {
   static final Map<String, _CropData> _cropTable = {
     // ── Grains ────────────────────────────────────────────────────────────────
     'Rice': _CropData(
-      n: const _NPKRate(90, 60, 30),
+      n: const _NPKRate(60, 45, 30),
       p: const _NPKRate(60, 30, 0),
       k: const _NPKRate(60, 30, 0),
       stages: const [
-        _Stage('Basal', '0 DAT (transplanting)', 1/3, 1.0, 0.5),
+        _Stage('Basal', '0 DAT (transplanting)', 1/3, 1.0, 0.5,
+            'Add 5 t/ha rice straw or compost before transplanting (ABFS)'),
         _Stage('Tillering', '14–21 DAT', 1/3, 0, 0),
         _Stage('Panicle Initiation', '45–55 DAT', 1/3, 0, 0.5,
             'Stop N application after heading'),
       ],
     ),
     'Corn': _CropData(
-      n: const _NPKRate(120, 90, 60),
+      n: const _NPKRate(80, 60, 40),
       p: const _NPKRate(60, 30, 0),
       k: const _NPKRate(60, 30, 0),
       stages: const [
-        _Stage('Basal', 'At planting', 1/3, 1.0, 1.0),
+        _Stage('Basal', 'At planting', 1/3, 1.0, 1.0,
+            'Add compost or vermicast at 2–3 t/ha at planting (ABFS)'),
         _Stage('Sidedress 1', '30 DAS', 1/3, 0, 0),
         _Stage('Sidedress 2', '45 DAS', 1/3, 0, 0),
       ],

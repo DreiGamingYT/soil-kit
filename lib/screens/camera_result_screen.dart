@@ -117,6 +117,12 @@ class CameraResultScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                 ],
 
+                // ── Uncalibrated warning banner ─────────────────────
+                if (result.isHeuristic) ...[
+                  _UncalibratedBanner(),
+                  const SizedBox(height: 12),
+                ],
+
                 // ── Score hero with nested donut ────────────────────
                 Container(
                   padding: const EdgeInsets.all(22),
@@ -256,6 +262,7 @@ class CameraResultScreen extends StatelessWidget {
                       value: result.nitrogenLevel,
                       dotColor: SoilColors.low,
                       levelColor: _levelColor(result.nitrogenLevel),
+                      isEstimated: result.isHeuristic,
                     ),
                     const SizedBox(height: 12),
                     Divider(color: cs.outline.withOpacity(0.5), height: 1),
@@ -266,6 +273,7 @@ class CameraResultScreen extends StatelessWidget {
                       value: result.phosphorusLevel,
                       dotColor: SoilColors.medium,
                       levelColor: _levelColor(result.phosphorusLevel),
+                      isEstimated: result.isHeuristic,
                     ),
                     const SizedBox(height: 12),
                     Divider(color: cs.outline.withOpacity(0.5), height: 1),
@@ -276,6 +284,7 @@ class CameraResultScreen extends StatelessWidget {
                       value: result.potassiumLevel,
                       dotColor: SoilColors.high,
                       levelColor: _levelColor(result.potassiumLevel),
+                      isEstimated: result.isHeuristic,
                     ),
                     const SizedBox(height: 12),
                     Divider(color: cs.outline.withOpacity(0.5), height: 1),
@@ -300,11 +309,15 @@ class CameraResultScreen extends StatelessWidget {
                         ),
                       )),
                       Text(
-                        '${result.ph}',
+                        result.isHeuristic
+                            ? '~${result.ph} (est.)'
+                            : '${result.ph}',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
+                          color: result.isHeuristic
+                              ? const Color(0xFFBF6E00)
+                              : cs.onSurface,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -340,29 +353,54 @@ class CameraResultScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // ── Actions ─────────────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.auto_fix_normal, size: 16),
-                    label: const Text('SoilMate Analysis'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
+                if (result.isHeuristic)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(Sr.rLg),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
                     ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FertRightScreen(
-                          initialN: result.nitrogenLevel,
-                          initialP: result.phosphorusLevel,
-                          initialK: result.potassiumLevel,
-                          initialPh: result.ph,
-                          initialSoilType: result.soilType,
+                    child: Row(children: [
+                      const Icon(Icons.lock_outline,
+                          size: 16, color: Color(0xFF9E9E9E)),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Fertilizer schedule unavailable — calibrate first to unlock',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF757575),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.auto_fix_normal, size: 16),
+                      label: const Text('SoilMate Analysis'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FertRightScreen(
+                            initialN: result.nitrogenLevel,
+                            initialP: result.phosphorusLevel,
+                            initialK: result.potassiumLevel,
+                            initialPh: result.ph,
+                            initialSoilType: result.soilType,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 10),
 
                 // ── Actions ─────────────────────────────────────────
@@ -548,16 +586,23 @@ class _LegendDot extends StatelessWidget {
 class _NutrientRow extends StatelessWidget {
   final String label, value;
   final Color dotColor, levelColor;
+  final bool isEstimated;
   const _NutrientRow({
     required this.label,
     required this.value,
     required this.dotColor,
     required this.levelColor,
+    this.isEstimated = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Amber-toned palette for uncalibrated state
+    const estBorder = Color(0xFFD68910);
+    const estBg     = Color(0xFFFFF8E1);
+    const estText   = Color(0xFF7B4F00);
+
     return Row(children: [
       Container(
         width: 10, height: 10,
@@ -575,20 +620,93 @@ class _NutrientRow extends StatelessWidget {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: levelColor.withOpacity(0.10),
+          color: isEstimated ? estBg : levelColor.withOpacity(0.10),
           borderRadius: BorderRadius.circular(Sr.rPill),
-          border: Border.all(color: levelColor.withOpacity(0.22)),
+          border: Border.all(
+            color: isEstimated ? estBorder.withOpacity(0.55) : levelColor.withOpacity(0.22),
+          ),
         ),
         child: Text(
-          value,
+          isEstimated ? '$value (est.)' : value,
           style: TextStyle(
-            color: levelColor,
+            color: isEstimated ? estText : levelColor,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
     ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Warning banner shown whenever NPK/pH were estimated without a calibrated kit.
+// ─────────────────────────────────────────────────────────────────────────────
+class _UncalibratedBanner extends StatelessWidget {
+  const _UncalibratedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(Sr.rLg),
+        border: Border.all(color: const Color(0xFFD68910).withOpacity(0.60)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          size: 20,
+          color: Color(0xFF7B4F00),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text(
+              'No calibration data — results are estimates only',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF7B4F00),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'N, P, K, and pH values were estimated from raw image colours '
+              'without a calibrated reference. These readings are unreliable '
+              'and must NOT be used for actual fertilizer decisions. '
+              'Please calibrate the app with your soil test kit colours first, '
+              'then re-analyse.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF7B4F00),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD68910).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(Sr.rPill),
+                border: Border.all(
+                  color: const Color(0xFFD68910).withOpacity(0.45),
+                ),
+              ),
+              child: const Text(
+                'Go to Settings → Calibration to set reference colours',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF7B4F00),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
   }
 }
 

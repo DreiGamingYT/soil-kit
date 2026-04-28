@@ -21,9 +21,9 @@ class CropRecommendationService {
       add('Mustasa', 2); add('Gabi', 2);  add('Mungbean', 2);
       add('Peanut', 2); add('Cassava', 1);
     }
-    // Moderately to Slightly Acid (5.6–6.8) — HIGH/OPTIMAL per BSWM
-    // This is the broadest and most suitable range for Philippine crops
-    if (ph >= 5.6 && ph <= 6.8) {
+    // Moderately to Slightly Acid → Near Neutral (5.6–7.0) — OPTIMAL per BSWM.
+    // Corn, tomato, eggplant, and most vegetables remain productive up to pH 7.0.
+    if (ph >= 5.6 && ph <= 7.0) {
       add('Corn', 3);     add('Rice', 3);     add('Soybean', 3);
       add('Tomato', 3);   add('Eggplant', 3); add('Ampalaya', 3);
       add('Kangkong', 3); add('Pechay', 3);   add('Mustasa', 2);
@@ -31,15 +31,20 @@ class CropRecommendationService {
       add('Kamote', 2);   add('Gabi', 2);      add('Mungbean', 2);
       add('Peanut', 2);
     }
-    // Slightly upper range (6.5–6.8) — allium/brassica crops still within optimal
-    if (ph >= 6.5 && ph <= 6.8) {
+    // Alliums and brassicas — optimal band is 6.0–7.5
+    if (ph >= 6.0 && ph <= 7.5) {
       add('Sibuyas', 3); add('Bawang', 3); add('Repolyo', 2);
     }
-    // Nearly Neutral to Alkaline (> 6.8) — LOW per BSWM (micronutrient lockout)
-    // Only very few alkali-tolerant crops recommended; correction also needed
-    if (ph > 6.8) {
-      add('Sibuyas', 1); add('Bawang', 1); // marginally tolerant up to ~7.2
-      // No other crops added — recommend pH correction first
+    // Near-neutral upper range (7.0–7.5) — reduced but not zero suitability.
+    // Corn, eggplant, and tomato are still viable; micronutrient availability
+    // starts to decline but is not yet critically impaired.
+    if (ph > 7.0 && ph <= 7.5) {
+      add('Corn', 1); add('Eggplant', 1); add('Tomato', 1);
+    }
+    // Alkaline (> 7.5) — micronutrient lockout likely; pH correction first.
+    // Only the most alkali-tolerant crops get any points at all.
+    if (ph > 7.5) {
+      add('Sibuyas', 1); add('Bawang', 1);
     }
 
     // ── 2. NPK-based adjustments ──────────────────────────────────────────────
