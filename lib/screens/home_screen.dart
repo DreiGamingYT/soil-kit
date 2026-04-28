@@ -12,6 +12,7 @@ import 'history_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
 import 'fertilizer_calculator_screen.dart';
+import 'fert_right_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final int selectedIndex;
