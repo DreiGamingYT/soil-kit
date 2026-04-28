@@ -8,6 +8,8 @@ import '../main.dart';
 import '../services/crop_recommendation_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
+import 'fert_right_screen.dart';
+
 class CameraResultScreen extends StatelessWidget {
   final SoilResult result;
   const CameraResultScreen({super.key, required this.result});
@@ -336,6 +338,32 @@ class CameraResultScreen extends StatelessWidget {
 
                 _DosageCalculator(result: result),
                 const SizedBox(height: 16),
+
+                // ── Actions ─────────────────────────────────────────
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.auto_fix_normal, size: 16),
+                    label: const Text('SoilMate Analysis'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FertRightScreen(
+                          initialN: result.nitrogenLevel,
+                          initialP: result.phosphorusLevel,
+                          initialK: result.potassiumLevel,
+                          initialPh: result.ph,
+                          initialSoilType: result.soilType,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
                 // ── Actions ─────────────────────────────────────────
                 Row(children: [

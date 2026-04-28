@@ -9,17 +9,19 @@ import 'services/notification_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// If you used FlutterFire CLI, uncomment this:
 import 'firebase_options.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsBinding binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
 
   await Firebase.initializeApp(
-    // If you used FlutterFire CLI, use this instead:
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  NotificationService.instance.setNavigatorKey(appNavigatorKey);
 
   Connectivity().onConnectivityChanged.listen((result) {
     if (result != ConnectivityResult.none &&
@@ -82,6 +84,7 @@ class SoilApp extends StatelessWidget {
       builder: (_, __, ___) => ValueListenableBuilder<ThemeMode>(
         valueListenable: s.themeMode,
         builder: (_, mode, __) => MaterialApp(
+          navigatorKey: appNavigatorKey,
           title: 'SoilMate',
           debugShowCheckedModeBanner: false,
           themeMode: mode,

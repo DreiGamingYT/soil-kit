@@ -27,7 +27,8 @@ enum _QualityIssue { none, tooDark, tooBright, blurry }
 // ─────────────────────────────────────────────────────────────────────────────
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final String? initialImagePath;
+  const CameraScreen({super.key, this.initialImagePath});
   @override
   State<CameraScreen> createState() => _CameraScreenState();
 }
@@ -142,8 +143,15 @@ class _CameraScreenState extends State<CameraScreen>
     _cornerAnim =
         CurvedAnimation(parent: _cornerCtrl, curve: Curves.easeOut);
 
-    _initCamera();
-    _loadWhiteRef();
+    _loadWhiteRef().then((_) {
+      if (widget.initialImagePath != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _analyzeImage(File(widget.initialImagePath!));
+        });
+      } else {
+        _initCamera();
+      }
+    });
   }
 
   @override
@@ -350,9 +358,9 @@ class _CameraScreenState extends State<CameraScreen>
       final prev = _detectState;
       setState(() {
         _soilConfidence = confidence;
-        if (confidence >= 0.42) {
+        if (confidence >= 0.55) {
           _detectState = _DetectState.soilFound;
-        } else if (confidence >= 0.20) {
+        } else if (confidence >= 0.30) {
           _detectState = _DetectState.scanning;
         } else {
           _detectState = _DetectState.noSoil;
@@ -365,15 +373,19 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   double _calcSoilConfidence(double r, double g, double b) {
+    // Hard rejects — clearly not soil
     if (b > r + 18 && b > g) return 0.05;
     if (g > r + 18 && g > b + 10) return 0.05;
-    if (r > 230 && g > 230 && b > 230) return 0.10;
+    if (r > 230 && g > 230 && b > 230) return 0.05;
     if (r < 15 && g < 15 && b < 15) return 0.0;
 
     final rf = r / 255, gf = g / 255, bf = b / 255;
     final maxC = [rf, gf, bf].reduce(math.max);
     final minC = [rf, gf, bf].reduce(math.min);
     final delta = maxC - minC;
+    final s = maxC == 0 ? 0.0 : delta / maxC;
+
+    if (s < 0.08) return 0.05;
 
     double h = 0;
     if (delta > 0) {
@@ -382,21 +394,27 @@ class _CameraScreenState extends State<CameraScreen>
       else                 h = 60 * (((rf - gf) / delta) + 4);
       if (h < 0) h += 360;
     }
-    final s = maxC == 0 ? 0.0 : delta / maxC;
 
     double score = 0.0;
-    if (h >= 0 && h <= 90)       score += 0.40;
-    else if (h > 90 && h <= 120) score += 0.15;
-    else if (h > 300)            score += 0.20;
 
-    if (r >= g && g >= b)       score += 0.30;
-    else if (r >= g)            score += 0.18;
-    else if (r >= b && g >= b)  score += 0.08;
+    // Hue score — soil is earthy (reds, oranges, yellows, warm browns: 0–60°)
+    if (h >= 0 && h <= 40)       score += 0.40;  // red-orange (iron-rich soil)
+    else if (h > 40 && h <= 60)  score += 0.35;  // orange-yellow (sandy/clay)
+    else if (h > 60 && h <= 90)  score += 0.15;  // yellow-green (marginal)
+    else if (h > 300)            score += 0.15;  // reddish-purple (some soils)
+    else return 0.05;                             // green/blue/cyan — not soil
 
-    if (s >= 0.08 && s <= 0.75) score += 0.20;
-    else if (s < 0.08)          score += 0.12;
+    // RGB order score — soil must have R dominance (brown = R > G > B)
+    if (r >= g && g >= b && r > b + 15) score += 0.30; // classic brown
+    else if (r >= g && r > b + 10)      score += 0.15; // reddish
+    else return 0.05;                                   // not R-dominant — reject
 
-    if (maxC >= 0.12) score += 0.10;
+    // Saturation score — soil is earthy, not vivid neon
+    if (s >= 0.12 && s <= 0.60) score += 0.20;  // ideal earthy range
+    else if (s > 0.60)          score += 0.05;  // too vivid (painted surface)
+
+    // Brightness — soil should be mid-range, not glowing
+    if (maxC >= 0.15 && maxC <= 0.80) score += 0.10;
 
     return score.clamp(0.0, 1.0);
   }

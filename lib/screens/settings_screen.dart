@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
+import '../services/soil_data_service.dart';
 import '../main.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -54,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: ElevatedButton.styleFrom(backgroundColor: SoilColors.low),
           onPressed: () {
             Navigator.pop(context);
+            SoilDataService.instance.results.clear();
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('History cleared'),
               backgroundColor: SoilColors.primary,

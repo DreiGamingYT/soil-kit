@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/fert_right_service.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FertRightScreen
-// Can be opened blank (from home) or pre-filled (from a scan result).
-// ─────────────────────────────────────────────────────────────────────────────
-
 class FertRightScreen extends StatefulWidget {
   final String? initialN;
   final String? initialP;
@@ -56,7 +51,7 @@ class _FertRightScreenState extends State<FertRightScreen> {
     _pLevel   = _normalise(widget.initialP) ?? 'Low';
     _kLevel   = _normalise(widget.initialK) ?? 'Low';
     _ph       = widget.initialPh ?? 0;
-    _soilType = widget.initialSoilType ?? 'Loam';
+    _soilType = _normaliseSoilType(widget.initialSoilType) ?? 'Loam';
     _phCtrl.text = _ph > 0 ? _ph.toStringAsFixed(1) : '';
 
     // If data came from a scan, show it immediately but allow lab override
@@ -79,6 +74,24 @@ class _FertRightScreenState extends State<FertRightScreen> {
     if (lower == 'medium') return 'Medium';
     if (lower == 'low')    return 'Low';
     return null;
+  }
+
+  String? _normaliseSoilType(String? raw) {
+    if (raw == null) return null;
+    final lower = raw.toLowerCase();
+
+    // Exact match first — already a valid soilTypes value
+    if (FertRightService.soilTypes.contains(raw)) return raw;
+
+    // Map inferSoilType() outputs → nearest FertRightService.soilTypes value
+    if (lower.contains('peaty'))  return 'Peaty';
+    if (lower.contains('sandy'))  return 'Sandy';
+    if (lower.contains('silty'))  return 'Silty Loam';
+    if (lower.contains('clay'))   return 'Clay';
+    if (lower.contains('loam'))   return 'Loam';
+
+    // Chalky / Mixed / anything unknown → default
+    return 'Loam';
   }
 
   bool get _hasPrefilledData => widget.initialN != null;
@@ -127,7 +140,7 @@ class _FertRightScreenState extends State<FertRightScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FertRight Analysis'),
+        title: const Text('SoilMate Analysis'),
         actions: [
           if (_result != null)
             _exporting
@@ -240,7 +253,7 @@ class _FertRightScreenState extends State<FertRightScreen> {
             // Generate button
             ElevatedButton.icon(
               icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: const Text('Generate BSWM Schedule'),
+              label: const Text('Generate Fertilizer Schedule'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: SoilColors.primary,
                 foregroundColor: Colors.white,
@@ -365,7 +378,7 @@ class _SourceToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
         borderRadius: BorderRadius.circular(Sr.rMd),
       ),
       child: Row(children: [
@@ -446,7 +459,7 @@ class _NpkRow extends StatelessWidget {
                         ? _chipColor(lvl, true).withOpacity(0.12)
                         : Theme.of(context)
                         .colorScheme
-                        .surfaceVariant
+                        .surfaceContainerHighest
                         .withOpacity(0.4),
                     border: Border.all(
                       color: selected

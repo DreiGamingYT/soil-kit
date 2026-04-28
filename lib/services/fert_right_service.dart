@@ -5,10 +5,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Data models
-// ─────────────────────────────────────────────────────────────────────────────
-
 class FertScheduleRow {
   final String stage;
   final String timing;
@@ -59,10 +55,6 @@ class FertRightResult {
     this.dataSource = 'DA-BSWM Adaptive Balanced Fertilization Strategy (ABFS)',
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _NPKRate {
   final double low;
@@ -419,7 +411,7 @@ class FertRightService {
           formula: '0-46-0',
           rateKgHa: totalTspHa * stage.pFrac,
           rateForArea: totalTsp * stage.pFrac,
-          notes: '',
+          notes: stage.notes,   // propagate stage note
         ));
       }
       if (stage.kFrac > 0 && totalMop > 0) {
@@ -430,7 +422,7 @@ class FertRightService {
           formula: '0-0-60',
           rateKgHa: totalMopHa * stage.kFrac,
           rateForArea: totalMop * stage.kFrac,
-          notes: '',
+          notes: stage.notes,   // propagate stage note
         ));
       }
     }
@@ -489,7 +481,7 @@ class FertRightService {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('SoilMate × FertRight',
+                pw.Text('SoilMate Analysis',
                     style: pw.TextStyle(
                         fontSize: 20, fontWeight: pw.FontWeight.bold)),
                 pw.Text('Fertilizer Recommendation Report',
@@ -538,7 +530,7 @@ class FertRightService {
                 border: pw.Border(left: pw.BorderSide(color: PdfColors.amber, width: 3)),
               ),
               child: pw.Text(
-                '⚠ pH Advisory: ${result.phCorrectionNote}',
+                'pH Advisory: ${result.phCorrectionNote}',
                 style: const pw.TextStyle(fontSize: 9, color: PdfColors.brown700),
               ),
             ),
@@ -599,12 +591,12 @@ class FertRightService {
     final bytes = await pdf.save();
     final dir = await getTemporaryDirectory();
     final cropSlug = result.crop.toLowerCase().replaceAll(' ', '_');
-    final file = File('${dir.path}/soilmate_fertright_$cropSlug.pdf');
+    final file = File('${dir.path}/soilmate_$cropSlug.pdf');
     await file.writeAsBytes(bytes);
 
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'application/pdf')],
-      subject: 'SoilMate FertRight Report — ${result.crop}',
+      subject: 'SoilMate Report — ${result.crop}',
     );
   }
 }

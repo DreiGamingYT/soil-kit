@@ -11,7 +11,6 @@ import 'profile_screen.dart';
 import 'history_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
-import 'fertilizer_calculator_screen.dart';
 import 'fert_right_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -37,7 +36,7 @@ class HomeScreen extends StatelessWidget {
       case 5:
         return const HistoryScreen(showBottomNav: false);
       case 6:
-        return const FertilizerCalculatorScreen();
+        return const FertRightScreen();
       default:
         return const _HomeBody();
     }
@@ -85,7 +84,9 @@ class _HomeBody extends StatelessWidget {
     if (pickedFile != null && context.mounted) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const CameraScreen()),
+        MaterialPageRoute(
+          builder: (_) => CameraScreen(initialImagePath: pickedFile.path),
+        ),
       );
     }
   }
@@ -272,7 +273,7 @@ class _DashboardFab extends StatelessWidget {
           ],
         ),
         child: Icon(
-          isSelected ? Icons.bar_chart_rounded : Icons.bar_chart_outlined,
+          isSelected ? Icons.bar_chart_rounded : Icons.bar_chart_rounded,
           color: isSelected
               ? Colors.white
               : Theme.of(context).colorScheme.onSurface.withOpacity(0.55),

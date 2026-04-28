@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/soil_result.dart';
 import '../services/image_analysis_service.dart';
 import '../services/calibration_service.dart';
+import '../services/soil_data_service.dart';
 import '../services/soil_logic_service.dart';
 import 'dashboard_screen.dart';
 import 'fertilizer_calculator_screen.dart';
@@ -9,7 +11,7 @@ import 'fert_right_screen.dart';
 class ResultScreen extends StatefulWidget {
   final String imagePath;
 
-  const ResultScreen(this.imagePath);
+  const ResultScreen(this.imagePath, {super.key});
 
   @override
   _ResultScreenState createState() => _ResultScreenState();
@@ -64,13 +66,28 @@ class _ResultScreenState extends State<ResultScreen> {
       String p = output["Phosphorus"] ?? "LOW";
       String k = output["Potassium"] ?? "LOW";
 
-      int score = logic.score(n, p, k);
+      final double ph = double.tryParse(output["pH"] ?? '') ?? 6.5;
+      int score = logic.score(n, p, k, ph: ph);
       String health = logic.healthLabel(score);
-      List<String> rec = logic.recommendation(n, p, k);
+      List<String> rec = logic.recommendation(n, p, k, ph: ph);
 
       output["Soil Health"] = health;
       output["Score"] = score.toString();
       output["Advice"] = rec.join("\n");
+
+      // Save to history
+      final soilResult = SoilResult(
+        soilType: SoilLogicService().inferSoilType(n, p, k, ph),
+        date: DateTime.now(),
+        overallScore: score.toDouble(),
+        status: health,
+        nitrogenLevel: n,
+        phosphorusLevel: p,
+        potassiumLevel: k,
+        ph: ph,
+        imagePath: widget.imagePath,
+      );
+      SoilDataService.instance.addResult(soilResult);
 
       setState(() {
         results = output;

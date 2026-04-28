@@ -114,6 +114,7 @@ class SoilDataService {
   Future<void> loadFromLocal() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('soil_results') ?? [];
+    if (raw.isEmpty) return; // keep sample data if nothing stored yet
     results
       ..clear()
       ..addAll(raw.map((e) {
