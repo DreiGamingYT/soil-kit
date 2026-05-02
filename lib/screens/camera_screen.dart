@@ -63,6 +63,12 @@ class _CameraScreenState extends State<CameraScreen>
   late AnimationController _cornerCtrl;
   late Animation<double>   _cornerAnim;
 
+  // ── Adaptive match threshold (strict when lighting is OK) ─────────────────
+  double get _matchThreshold {
+    if (_qualityIssue == _QualityIssue.none) return 35.0;
+    return 55.0;
+  }
+
   // ── Services ──────────────────────────────────────────────────────────────
   final _imgService   = ImageAnalysisService();
   final _calService   = CalibrationService();
@@ -438,7 +444,12 @@ class _CameraScreenState extends State<CameraScreen>
 
     try {
       if (_torchOn) await _ctrl!.setFlashMode(FlashMode.off);
+      try {
+        await _ctrl!.setExposureMode(ExposureMode.locked);
+        await Future.delayed(const Duration(milliseconds: 150));
+      } catch (_) {}
       final xfile = await _ctrl!.takePicture();
+      try { await _ctrl!.setExposureMode(ExposureMode.auto); } catch (_) {}
       if (_torchOn) await _ctrl!.setFlashMode(FlashMode.torch);
       setState(() { _isCapturing = false; _isAnalyzing = true; });
       await _analyzeImage(File(xfile.path));
@@ -627,7 +638,7 @@ class _CameraScreenState extends State<CameraScreen>
       }),
     );
 
-    final matched = _imgService.matchLevel(sampleRGB, levels, threshold: 80);
+    final matched = _imgService.matchLevel(sampleRGB, levels, threshold: _matchThreshold);
     switch (matched.toUpperCase()) {
       case 'HIGH':   return 'High';
       case 'MEDIUM': return 'Medium';
@@ -645,7 +656,7 @@ class _CameraScreenState extends State<CameraScreen>
           return MapEntry(e.key, vals);
         }),
       );
-      final matched = _imgService.matchLevel(sampleRGB, levels, threshold: 80);
+      final matched = _imgService.matchLevel(sampleRGB, levels, threshold: _matchThreshold);
       switch (matched.toUpperCase()) {
         case 'LOW':    return 5.0;
         case 'MEDIUM': return 6.2;

@@ -140,7 +140,7 @@ class _FertRightScreenState extends State<FertRightScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SoilMate Analysis'),
+        title: const Text('Fertilizer Schedule'),
         actions: [
           if (_result != null)
             _exporting

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
 import '../services/soil_data_service.dart';
 import '../main.dart';
+import 'calibration_screen.dart';
+import 'device_check_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -139,6 +141,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         sub: _s.tr('auto_analyze_sub'),
                         value: auto,
                         onChanged: (v) => setState(() => _s.autoAnalyze.value = v),
+                      ),
+                      _ActionRow(
+                        icon: Icons.phone_android_outlined,
+                        label: 'Device Compatibility Check',
+                        sub: 'Check if your phone camera is ready for scanning',
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(
+                                builder: (_) => const DeviceCheckScreen())),
+                      ),
+                      _ActionRow(
+                        icon: Icons.tune_outlined,
+                        label: 'White Reference & Calibration',
+                        sub: 'Re-calibrate for current lighting conditions',
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(
+                                builder: (_) => CalibrationScreen())),
                       ),
                     ]),
                     const SizedBox(height: 24),

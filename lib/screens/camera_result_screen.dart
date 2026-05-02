@@ -8,7 +8,7 @@ import '../main.dart';
 import '../services/crop_recommendation_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-import 'fert_right_screen.dart';
+import 'crop_guide_screen.dart';
 
 class CameraResultScreen extends StatelessWidget {
   final SoilResult result;
@@ -381,21 +381,17 @@ class CameraResultScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.auto_fix_normal, size: 16),
-                      label: const Text('SoilMate Analysis'),
+                      icon: const Icon(Icons.eco_rounded, size: 16),
+                      label: const Text('View Crop Guide'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
+                        backgroundColor: const Color(0xFF3A5C38),
                         foregroundColor: Colors.white,
                       ),
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => FertRightScreen(
-                            initialN: result.nitrogenLevel,
-                            initialP: result.phosphorusLevel,
-                            initialK: result.potassiumLevel,
-                            initialPh: result.ph,
-                            initialSoilType: result.soilType,
+                          builder: (_) => CropGuideScreen(
+                            initialResult: result,
                           ),
                         ),
                       ),

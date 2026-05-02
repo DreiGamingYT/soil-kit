@@ -47,9 +47,9 @@ class AppBottomNav extends StatelessWidget {
           Expanded(child: _NavItem(icon: Icons.shopping_cart_outlined, activeIcon: Icons.shopping_cart_rounded, label: 'Shop', isSelected: selectedIndex == 3, onTap: () => onTap(3), badge: cartCount > 0 ? cartCount : null)),
           Expanded(child: _NavItem(icon: Icons.edit_note_outlined, activeIcon: Icons.edit_note_rounded, label: 'Notes', isSelected: selectedIndex == 4, onTap: () => onTap(4))),
           Expanded(child: _NavItem(
-            icon: Icons.auto_fix_high,
-            activeIcon: Icons.auto_fix_high_rounded,
-            label: 'Analyze',
+            icon: Icons.eco_outlined,
+            activeIcon: Icons.eco_rounded,
+            label: 'Crops',
             isSelected: selectedIndex == 6,
             onTap: () => onTap(6),
           )),
