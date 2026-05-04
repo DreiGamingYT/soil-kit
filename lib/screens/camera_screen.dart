@@ -20,7 +20,8 @@ enum _QualityIssue { none, tooDark, tooBright, blurry }
 
 class CameraScreen extends StatefulWidget {
   final String? initialImagePath;
-  const CameraScreen({super.key, this.initialImagePath});
+  final SoilTestType? testType;
+  const CameraScreen({super.key, this.initialImagePath, this.testType});
   @override
   State<CameraScreen> createState() => _CameraScreenState();
 }
@@ -90,6 +91,34 @@ class _CameraScreenState extends State<CameraScreen>
       case _DetectState.noSoil:   return 'No soil — aim at sample';
       case _DetectState.scanning: return 'Scanning…';
     }
+  }
+
+  Widget _buildTestTypeBadge() {
+    final t = widget.testType;
+    if (t == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: t.color.withOpacity(0.7), width: 1.5),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(color: t.color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          t.label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ]),
+    );
   }
 
   // ── Quality helpers (Feature 5) ───────────────────────────────────────────
@@ -595,7 +624,8 @@ class _CameraScreenState extends State<CameraScreen>
         potassiumLevel:  potassiumLevel,
         ph:              double.parse(ph.toStringAsFixed(1)),
         imagePath:       file.path,
-        isHeuristic:     isHeuristic,   // ← passed through to result screen
+        isHeuristic:     isHeuristic,
+        testType:        widget.testType,
       );
 
       if (!mounted) return;
@@ -815,6 +845,8 @@ class _CameraScreenState extends State<CameraScreen>
                         ),
                       ),
                       const SizedBox(width: 7),
+                      _buildTestTypeBadge(),
+                      const SizedBox(height: 8),
                       Text(_stateLabel,
                           style: TextStyle(
                             color: _stateColor,

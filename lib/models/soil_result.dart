@@ -1,3 +1,34 @@
+import 'dart:ui';
+
+enum SoilTestType { nitrogen, phosphorus, potassium, ph }
+
+extension SoilTestTypeExt on SoilTestType {
+  String get label {
+    switch (this) {
+      case SoilTestType.nitrogen:   return 'Nitrogen (N)';
+      case SoilTestType.phosphorus: return 'Phosphorus (P)';
+      case SoilTestType.potassium:  return 'Potassium (K)';
+      case SoilTestType.ph:         return 'pH Level';
+    }
+  }
+  String get shortLabel {
+    switch (this) {
+      case SoilTestType.nitrogen:   return 'N';
+      case SoilTestType.phosphorus: return 'P';
+      case SoilTestType.potassium:  return 'K';
+      case SoilTestType.ph:         return 'pH';
+    }
+  }
+  Color get color {
+    switch (this) {
+      case SoilTestType.nitrogen:   return const Color(0xFF4CAF50);
+      case SoilTestType.phosphorus: return const Color(0xFFFF9800);
+      case SoilTestType.potassium:  return const Color(0xFF9C27B0);
+      case SoilTestType.ph:         return const Color(0xFF2196F3);
+    }
+  }
+}
+
 class SoilResult {
   final String soilType;
   final DateTime date;
@@ -9,10 +40,8 @@ class SoilResult {
   final double ph;
   final String? imagePath;
 
-  /// True when NPK and pH were estimated via the RGB heuristic fallback
-  /// (i.e. no calibration data was present at analysis time).
-  /// Results in this state are unreliable and must be clearly flagged to the user.
   final bool isHeuristic;
+  final SoilTestType? testType;
 
   SoilResult({
     required this.soilType,
@@ -25,6 +54,7 @@ class SoilResult {
     required this.ph,
     this.imagePath,
     this.isHeuristic = false,
+    this.testType,
   });
 
   String get phDescription {

@@ -73,6 +73,22 @@ class CameraResultScreen extends StatelessWidget {
                     fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface,
                   ),
                 ),
+                if (result.testType != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: result.testType!.color.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      result.testType!.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: result.testType!.color,
+                      ),
+                    ),
+                  ),
                 Text(
                   dateStr,
                   style: TextStyle(
